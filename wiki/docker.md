@@ -6,6 +6,7 @@
 - [Container](#container)
   - [Why containers are useful](#why-containers-are-useful)
   - [Containers and host](#containers-and-host)
+  - [Container ID](#container-id)
 - [What is `Docker`](#what-is-docker)
 - [Set up `Docker`](#set-up-docker)
   - [Install `Docker`](#install-docker)
@@ -63,6 +64,8 @@ A container is an isolated runtime for an application and its dependencies.
 │ ┄┄┄┄┄┄┄┄┄┄┄┄┄┄ Linux kernel (shared) ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄ │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+### Container ID
 
 ## What is `Docker`
 
