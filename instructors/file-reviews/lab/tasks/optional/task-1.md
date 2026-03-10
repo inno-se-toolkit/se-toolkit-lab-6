@@ -69,7 +69,7 @@ Not applicable — no AI-assisted steps in this task.
 
 ### Section 1. Task document template
 
-1. **[Medium]** Between lines 13 and 15 — Missing `<h4>Diagram</h4>` section. The task involves actions across multiple environments (editor for `docker-compose.yml`, terminal/VM for `Docker` commands, browser for `Grafana` UI, `Grafana` connecting to `PostgreSQL` via `Docker` network). Convention 1.1 requires a Mermaid sequence diagram when the task involves actions across multiple actors or environments. Suggested fix: add a `sequenceDiagram` showing Developer → VM (Docker) → Browser (Grafana) → PostgreSQL flow.
+1. ~~**[Medium]** Between lines 13 and 15 — Missing `<h4>Diagram</h4>` section. The task involves actions across multiple environments (editor for `docker-compose.yml`, terminal/VM for `Docker` commands, browser for `Grafana` UI, `Grafana` connecting to `PostgreSQL` via `Docker` network). Convention 1.1 requires a Mermaid sequence diagram when the task involves actions across multiple actors or environments. Suggested fix: add a `sequenceDiagram` showing Developer → VM (Docker) → Browser (Grafana) → PostgreSQL flow.~~
 2. **[Medium]** Lines 138–140 — Step 1.7 "Finish the task" body doesn't match the template pattern. The template for "Finish the task" requires PR creation and review steps (`1. Create a PR… 2. Get a PR review…`). The current body only has "Close the issue." This is a structural mismatch between the heading and the ending type.
 3. **[Medium]** The task modifies `docker-compose.yml` (step 1.2, line 41) but has no "Follow the `Git workflow`" step (expected as step 1.1 per convention 1.1). If the task is designed as a no-commit exploration, the file modification creates a design inconsistency with the template rules.
 
@@ -103,7 +103,7 @@ No issues found.
 
 ### 4.8. Links and cross-references
 
-1. **[Low]** Line 83 — `docker-compose.yml` is mentioned in prose in section 1.4 but is not linked. Convention 4.8 requires linking a concept or file on its first mention within each section. The file was linked in section 1.2 (line 37) but this is a different `###`-level section. Suggested fix: link to `[`docker-compose.yml`](../../../docker-compose.yml)`.
+1. ~~**[Low]** Line 83 — `docker-compose.yml` is mentioned in prose in section 1.4 but is not linked. Convention 4.8 requires linking a concept or file on its first mention within each section. The file was linked in section 1.2 (line 37) but this is a different `###`-level section. Suggested fix: link to `[`docker-compose.yml`](../../../docker-compose.yml)`.~~
 
 ### 4.9. Notes, tips, warnings
 
@@ -199,10 +199,10 @@ No empty sections found.
 | Conceptual [Medium] | 5 |
 | Conceptual [Low] | 5 |
 | Convention [High] | 0 |
-| Convention [Medium] | 3 |
-| Convention [Low] | 2 |
+| Convention [Medium] | 2 |
+| Convention [Low] | 1 |
 | TODOs | 0 |
 | Empty sections | 0 |
-| **Total** | **16** |
+| **Total** | **14** |
 
-**Overall:** The task provides a clear, well-structured walkthrough for setting up `Grafana` with good use of `SQL` examples and a useful reflection step. The most critical issue is that two acceptance criteria (dashboard panels and reflection comment) cannot be verified by the autochecker through standard channels (D12). The task also has a structural inconsistency: it modifies `docker-compose.yml` but uses a no-code ending pattern, with the "Finish the task" heading mismatched to a "Close the issue" body (D9, Section 1). Adding a `<h4>Diagram</h4>` section, a troubleshooting block for the `Docker` step, and checkpoints for steps 1.2 and 1.5 would improve the student experience.
+**Overall:** The task provides a clear, well-structured walkthrough for setting up `Grafana` with good use of `SQL` examples and a useful reflection step. The most critical issue is that two acceptance criteria (dashboard panels and reflection comment) cannot be verified by the autochecker through standard channels (D12). The task also has a structural inconsistency: it modifies `docker-compose.yml` but uses a no-code ending pattern, with the "Finish the task" heading mismatched to a "Close the issue" body (D9, Section 1). Adding a troubleshooting block for the `Docker` step, checkpoints for steps 1.2 and 1.5, and linking environment variable names to their wiki sections would improve the student experience.

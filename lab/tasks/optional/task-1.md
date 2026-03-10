@@ -12,6 +12,30 @@ Set up `Grafana` as an alternative dashboard tool, connect it to `PostgreSQL`, a
 
 In the required tasks, you built a custom dashboard with `Chart.js` inside the `React` front-end. `Grafana` is a dedicated dashboarding tool used in industry for monitoring and analytics — it connects directly to the database and lets you build dashboards without writing front-end code.
 
+<h4>Diagram</h4>
+
+```mermaid
+sequenceDiagram
+    actor Developer
+    participant GH as GitHub
+    participant VM as VM<br/>(Docker)
+    participant Grafana as Grafana<br/>(browser)
+    participant PG as PostgreSQL<br/>(Docker)
+
+    Developer->>GH: Create Lab Task issue
+    Developer->>VM: Uncomment Grafana service
+    Developer->>VM: docker compose up --build -d
+    Developer->>Grafana: Log in
+    Developer->>Grafana: Add PostgreSQL data source
+    Grafana->>PG: Test connection
+    PG-->>Grafana: Connection OK
+    Developer->>Grafana: Build dashboard with SQL panels
+    Grafana->>PG: Execute SQL queries
+    PG-->>Grafana: Query results
+    Developer->>GH: Write reflection comment
+    Developer->>GH: Close the issue
+```
+
 <h4>Table of contents</h4>
 
 - [1. Steps](#1-steps)
@@ -80,7 +104,7 @@ Title: `[Task] Grafana Dashboard`
    > 🟦 **Note**
    >
    > `Grafana` connects to `PostgreSQL` through the `Docker` network.
-   > The hostname `postgres` is the service name from `docker-compose.yml`.
+   > The hostname `postgres` is the service name from [`docker-compose.yml`](../../../docker-compose.yml).
 
 4. Click **Save & test**. You should see a "Database Connection OK" message.
 
