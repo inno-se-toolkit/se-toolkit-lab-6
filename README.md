@@ -10,6 +10,7 @@ The lab gets updated regularly, so do [sync your fork with the upstream](https:/
 - [Tasks](#tasks)
   - [Prerequisites](#prerequisites)
   - [Required](#required)
+  - [Optional (recommended)](#optional-recommended)
 
 ## Lab story
 
@@ -63,3 +64,9 @@ In simple words, you should be able to say:
 1. [Basic agent loop](./lab/tasks/required/task-1.md#basic-agent-loop)
 2. [Add tools](./lab/tasks/required/task-2.md#add-tools)
 3. [Pass the benchmark](./lab/tasks/required/task-3.md#pass-the-benchmark)
+
+### Optional (recommended)
+
+1. [Advanced agent features](./lab/tasks/optional/task-1.md#advanced-agent-features)
+   - Includes **retry logic with backoff** for 429/5xx LLM API errors.
+   - Highly recommended if you use free-tier models (rate limits happen often).
