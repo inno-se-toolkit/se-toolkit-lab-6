@@ -59,6 +59,8 @@ Your agent needs an LLM that supports the OpenAI-compatible chat completions API
 
 [OpenRouter](https://openrouter.ai) offers free models with no credit card required. Look for models that support **tool calling** — you will need this in Task 2.
 
+> **Tip:** Free-tier models can hit rate limits (`429`) and occasional `5xx` errors. Keep this in mind when designing your agent and see [Optional Task 1](../optional/task-1.md#advanced-agent-features) for retry logic with backoff.
+
 Store your LLM key in `.env.agent.secret` (gitignored by the `*.secret` pattern). An example file is provided:
 
 ```bash

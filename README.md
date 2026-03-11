@@ -68,5 +68,3 @@ In simple words, you should be able to say:
 ### Optional (recommended)
 
 1. [Advanced agent features](./lab/tasks/optional/task-1.md#advanced-agent-features)
-   - Includes **retry logic with backoff** for 429/5xx LLM API errors.
-   - Highly recommended if you use free-tier models (rate limits happen often).
