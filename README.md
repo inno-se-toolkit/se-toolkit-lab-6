@@ -13,18 +13,11 @@ The lab gets updated regularly, so do [sync your fork with the upstream](https:/
 
 ## Lab story
 
-> "Everybody should implement an agent loop at some point."
+> "Everybody should implement an agent loop at some point. It's the hello-world of agentic engineering."
 
 You've used AI agents throughout the course — now you'll build one from scratch.
 
-You have a running Learning Management Service — a backend, a database, and a frontend dashboard. You'll build a **CLI agent** that answers questions about the course and about your own system, evaluated against a hidden benchmark — like building an algorithm against a test suite.
-
-Throughout the course you used agents but never looked under the hood. The risk: you copy-paste in early labs and vibe-code in later ones without understanding what's actually happening. This lab forces understanding at two levels:
-
-1. **Agent mechanics** — you implement the loop (prompt → LLM → tool call → execute → feed result → answer) and see there's no magic.
-2. **Course material** — the benchmark questions cover labs 1–6. To debug a wrong answer, you have to understand the material. The agent is the vehicle; the questions are the test.
-
-By the time your agent passes, you've reviewed everything and understood how agents work.
+You have a running Learning Management Service — a backend, a database, and a frontend dashboard. You'll build a **CLI agent** that answers questions about the course and about your own system, and then evaluate the agent against a benchmark.
 
 ## Learning advice
 
