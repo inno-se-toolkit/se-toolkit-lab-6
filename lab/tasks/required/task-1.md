@@ -1,12 +1,12 @@
-# Basic Agent Loop
+# Call an LLM from Code
 
-Build a CLI agent that connects to an LLM and answers questions about the course.
+Build a CLI that connects to an LLM and answers questions about the course.
 
 ## [Git workflow](../../../wiki/git-workflow.md)
 
-1. Create an issue titled `[Task] Basic Agent Loop`.
+1. Create an issue titled `[Task] Call an LLM from Code`.
 2. Pull latest `main` from `origin` and `upstream`.
-3. Create a branch from `main` (e.g., `task/basic-agent-loop`).
+3. Create a branch from `main` (e.g., `task/call-an-llm-from-code`).
 4. Work on the branch. Commit as you go using [conventional commits](https://www.conventionalcommits.org/) (e.g., `feat:`, `docs:`, `test:`).
 5. Push, create a PR to `main` in **your fork** (not upstream). Link the issue using a keyword (e.g., `Closes #1`).
 6. Get a review from your partner, merge (this closes the issue automatically), delete the branch.
@@ -82,7 +82,7 @@ Before writing code, create `plans/task-1.md`. Describe your plan:
 Commit:
 
 ```text
-docs: add implementation plan for basic agent loop
+docs: add implementation plan for LLM integration
 ```
 
 ### 2. Agent (`agent.py`)
@@ -100,7 +100,7 @@ Create `agent.py` in the project root. The agent must handle questions about the
 Commit:
 
 ```text
-feat: implement basic agent loop with LLM integration
+feat: implement LLM-powered agent CLI
 ```
 
 ### 3. Documentation (`AGENT.md`)

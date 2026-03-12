@@ -41,7 +41,7 @@ A senior engineer explains the assignment:
 
 ## Required tasks
 
-### Task 1 — Basic Agent Loop
+### Task 1 — Call an LLM from Code
 
 **Purpose:**
 
