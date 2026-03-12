@@ -35,30 +35,89 @@ Update your system prompt so the LLM knows when to use wiki tools vs `query_api`
 
 > **Note:** Two distinct keys: `LMS_API_KEY` (in `.env.docker.secret`) protects your backend endpoints. `LLM_API_KEY` (in `.env.agent.secret`) authenticates with your LLM provider. Don't mix them up.
 
+## Deploy to your VM
+
+Before running the benchmark, deploy your application to the VM so the autochecker can query your API.
+
+### Clean up the previous lab
+
+1. [Connect to your VM](../../../wiki/vm.md#connect-to-the-vm).
+2. Navigate to the previous lab's project directory:
+
+   ```terminal
+   cd ~/se-toolkit-lab-5
+   ```
+
+3. Stop and remove all containers and volumes:
+
+   ```terminal
+   docker compose --env-file .env.docker.secret down -v
+   ```
+
+4. Go back to the home directory:
+
+   ```terminal
+   cd ~
+   ```
+
+> [!NOTE]
+> If you didn't do Lab 5, try `cd ~/se-toolkit-lab-4` instead.
+> If neither directory exists, skip the cleanup.
+
+### Deploy the application
+
+1. Clone your fork on the VM:
+
+   ```terminal
+   cd ~
+   git clone https://github.com/<your-github-username>/se-toolkit-lab-6.git
+   cd se-toolkit-lab-6
+   ```
+
+2. Create and configure the environment file:
+
+   ```terminal
+   cp .env.docker.example .env.docker.secret
+   nano .env.docker.secret
+   ```
+
+   Set your autochecker API credentials and `LMS_API_KEY` (same values as your local `.env.docker.secret`).
+
+   Save and exit: `Ctrl+X`, then `y`, then `Enter`.
+
+3. Start the services:
+
+   ```terminal
+   docker compose --env-file .env.docker.secret up --build -d
+   ```
+
+4. Populate the database — open `http://<your-vm-ip>:42002/docs`, authorize with your `LMS_API_KEY`, and call `POST /pipeline/sync`.
+
 ## Pass the benchmark
 
-Once `query_api` works, run the evaluation benchmark and iterate until your agent passes.
+Once `query_api` works, run the evaluation benchmark locally and iterate until your agent passes.
 
 ```bash
 uv run run_eval.py
 ```
 
-The script fetches questions from the autochecker API, runs your agent on each one, and checks the answer. On failure it shows a feedback hint.
+The script runs your agent against 10 local questions across all classes (wiki lookup, system facts, data queries, bug diagnosis, reasoning). On failure it shows a feedback hint.
 
 ```
-  ✓ [1/26] How do you resolve a merge conflict?
-  ✓ [2/26] What is a Docker volume used for?
-  ✓ [3/26] What framework does the backend use?
+  ✓ [1/10] According to the project wiki, what steps are needed to protect a branch?
+  ✓ [2/10] What Python web framework does this project use?
+  ✓ [3/10] How many items are in the database?
 
-  ✗ [4/26] You change your Python code and run 'docker compose up -d'...
-    feedback: Think about when Docker rebuilds the image vs reuses the old one.
+  ✗ [4/10] Query the /analytics/completion-rate endpoint for lab-99...
+    feedback: Try GET /analytics/completion-rate?lab=lab-99. Read the error, then find the buggy line.
 
-3/26 passed
+3/10 passed
 ```
 
 Fix the failing question, re-run, move on to the next one.
 
-> **Note:** The autochecker bot tests your agent with additional hidden questions not present in `run_eval.py`. These include multi-step challenges that require chaining tools. You need a genuinely working agent — not hard-coded answers.
+> [!NOTE]
+> The autochecker tests your agent with 10 additional hidden questions not present in `run_eval.py`. These include multi-step challenges that require chaining tools (e.g., query an API error, then read the source code to diagnose the bug). You need a genuinely working agent — not hard-coded answers.
 
 ### Debugging workflow
 
@@ -95,9 +154,9 @@ Add 5 regression tests for system agent tools. Example questions:
 
 ### 5. Deployment
 
-Deploy the final agent to your VM. Make sure both `.env.agent.secret` (LLM key) and `.env.docker.secret` (backend API key) are configured.
+Deploy the final agent to your VM. Make sure both `.env.agent.secret` (LLM key) and `.env.docker.secret` (backend API key) are configured on the VM.
 
-The autochecker bot will run the full benchmark including hidden questions. You need at least **75%** to pass.
+The autochecker will run the full benchmark including hidden questions. You need at least **75%** to pass.
 
 ## Acceptance criteria
 
@@ -106,9 +165,9 @@ The autochecker bot will run the full benchmark including hidden questions. You 
 - [ ] `query_api` authenticates with `LMS_API_KEY`.
 - [ ] The agent answers static system questions correctly (framework, ports, status codes).
 - [ ] The agent answers data-dependent questions with plausible values.
-- [ ] `run_eval.py` passes all local questions.
+- [ ] `run_eval.py` passes all 10 local questions.
 - [ ] `AGENT.md` documents the final architecture and lessons learned (at least 200 words).
 - [ ] 5 tool-calling regression tests exist and pass.
-- [ ] The agent works on the VM via SSH.
+- [ ] The application is deployed and running on the VM.
 - [ ] The agent passes the autochecker bot benchmark (≥75%).
 - [ ] [Git workflow](../../../wiki/git-workflow.md): issue `[Task] The System Agent`, branch, PR with `Closes #...`, partner approval, merge.

@@ -54,9 +54,11 @@ Edit `.env.agent.secret` and fill in `LLM_API_KEY`, `LLM_API_BASE`, and `LLM_MOD
 
 > **Note:** This is **not** the same as `LMS_API_KEY` in `.env.docker.secret`. That one protects your backend LMS endpoints. `LLM_API_KEY` authenticates with your LLM provider.
 
-Set up the same LLM credentials on your VM too — the autochecker will run your agent there.
-
-> **Note:** Free-tier models can hit rate limits (`429`) and occasional `5xx` errors. Keep this in mind when designing your agent and see [Optional Task 1](../optional/task-1.md#advanced-agent-features) for retry logic with backoff.
+> [!WARNING]
+> Free-tier models on OpenRouter have a **50 requests per day** limit per account. Plan your testing carefully:
+> - Use short, focused test runs instead of running the full eval repeatedly.
+> - Consider creating multiple OpenRouter accounts if you hit the limit.
+> - Implement retry logic with backoff for `429` errors (see [Optional Task 1](../optional/task-1.md#advanced-agent-features)).
 
 ## Deliverables
 
@@ -76,16 +78,6 @@ Create `AGENT.md` in the project root documenting how the agent works, which LLM
 
 Create 5 regression tests that run `agent.py` as a subprocess, parse the stdout JSON, and check that `answer` and `tool_calls` are present.
 
-### 5. Deployment
-
-Deploy `agent.py` to your VM. Verify it works:
-
-```bash
-uv run agent.py "What does REST stand for?"
-```
-
-The autochecker will SSH in and run your agent the same way.
-
 ## Acceptance criteria
 
 - [ ] `plans/task-1.md` exists with the implementation plan (committed before code).
@@ -94,5 +86,4 @@ The autochecker will SSH in and run your agent the same way.
 - [ ] The API key is stored in `.env.agent.secret` (not hardcoded).
 - [ ] `AGENT.md` documents the solution architecture.
 - [ ] 5 regression tests exist and pass.
-- [ ] The agent works on the VM via SSH.
 - [ ] [Git workflow](../../../wiki/git-workflow.md): issue `[Task] Call an LLM from Code`, branch, PR with `Closes #...`, partner approval, merge.

@@ -1,78 +1,49 @@
 # Lab setup
 
 - [1. Required steps](#1-required-steps)
-  - [1.1. Clean up the previous lab (on your VM)](#11-clean-up-the-previous-lab-on-your-vm)
-  - [1.2. Set up your fork](#12-set-up-your-fork)
-  - [1.3. Clone your fork and set up the environment (on your laptop)](#13-clone-your-fork-and-set-up-the-environment-on-your-laptop)
-  - [1.4. Deploy to your VM](#14-deploy-to-your-vm)
-  - [1.5. Populate the database](#15-populate-the-database)
-  - [1.6. Verify the deployment](#16-verify-the-deployment)
-  - [1.7. Coding agent](#17-coding-agent)
+  - [1.1. Set up your fork](#11-set-up-your-fork)
+  - [1.2. Clone your fork and set up the environment](#12-clone-your-fork-and-set-up-the-environment)
+  - [1.3. Start the services locally](#13-start-the-services-locally)
+  - [1.4. Populate the database](#14-populate-the-database)
+  - [1.5. Verify the local deployment](#15-verify-the-local-deployment)
+  - [1.6. Coding agent](#16-coding-agent)
 
 ## 1. Required steps
 
 > [!NOTE]
 > This lab builds on the same tools and setup from previous labs.
 > If you completed Labs 4–5, most tools are already installed.
-> The main changes are: a new repo, populating data, and setting up LLM access.
+> The main changes are: a new repo, local deployment, and setting up LLM access.
 
 > [!NOTE]
 > This lab needs your university email, GitHub alias, and VM IP in the Autochecker bot <https://t.me/auchebot>. If you haven't registered, do so now. If you want to change something, contact your TA.
 
-### 1.1. Clean up the previous lab (on your VM)
+### 1.1. Set up your fork
 
-> [!IMPORTANT]
-> Remove previous lab containers and volumes to free up ports and disk space on your VM.
-
-1. [Connect to your VM](../../wiki/vm.md#connect-to-the-vm).
-2. Navigate to the previous lab's project directory:
-
-   ```terminal
-   cd ~/se-toolkit-lab-5
-   ```
-
-3. Stop and remove all containers and volumes:
-
-   ```terminal
-   docker compose --env-file .env.docker.secret down -v
-   ```
-
-4. Go back to the home directory:
-
-   ```terminal
-   cd ~
-   ```
-
-> [!NOTE]
-> If you didn't do Lab 5, try `cd ~/se-toolkit-lab-4` instead.
-> If neither directory exists, skip this step.
-
-### 1.2. Set up your fork
-
-#### 1.2.1. Fork the course instructors' repo
+#### 1.1.1. Fork the course instructors' repo
 
 1. Fork the [lab's repo](https://github.com/inno-se-toolkit/se-toolkit-lab-6).
 
 We refer to your fork as `fork` and to the original repo as `upstream`.
 
-#### 1.2.2. Go to your fork
+#### 1.1.2. Go to your fork
 
 1. Go to your fork, it should look like `https://github.com/<your-github-username>/se-toolkit-lab-6`.
 
-#### 1.2.3. Enable issues
+#### 1.1.3. Enable issues
 
 1. [Enable issues](../../wiki/github.md#enable-issues).
 
-#### 1.2.4. Add a classmate as a collaborator
+#### 1.1.4. Add a classmate as a collaborator
 
 1. [Add a collaborator](../../wiki/github.md#add-a-collaborator) — your partner.
 2. Your partner should add you as a collaborator in their repo.
 
-#### 1.2.5. Protect your `main` branch
+#### 1.1.5. Protect your `main` branch
 
 1. [Protect a branch](../../wiki/github.md#protect-a-branch).
 
-### 1.3. Clone your fork and set up the environment (on your laptop)
+### 1.2. Clone your fork and set up the environment
 
 1. Clone your fork to your local machine:
 
@@ -109,56 +80,13 @@ We refer to your fork as `fork` and to the original repo as `upstream`.
    > [!IMPORTANT]
    > The credentials must match your autochecker bot registration.
 
-### 1.4. Deploy to your VM
-
-#### 1.4.1. Connect to your VM and clone the repo
-
-1. Connect to your VM:
-
-   ```terminal
-   ssh <vm-user>@<vm-ip>
-   ```
-
-   If unable, see [how to connect to your VM](../../wiki/vm.md#connect-to-the-vm).
-
-2. Clone your fork on the VM:
-
-   ```terminal
-   cd ~
-   git clone https://github.com/<your-github-username>/se-toolkit-lab-6.git
-   cd se-toolkit-lab-6
-   ```
-
-#### 1.4.2. Prepare the environment (on the VM)
-
-1. Create the `Docker` environment file:
-
-   ```terminal
-   cp .env.docker.example .env.docker.secret
-   ```
-
-2. Edit `.env.docker.secret`:
-
-   ```terminal
-   nano .env.docker.secret
-   ```
-
-   Set your autochecker API credentials:
-
-   ```text
-   AUTOCHECKER_EMAIL=<your-email>@innopolis.university
-   AUTOCHECKER_PASSWORD=<your-github-username><your-telegram-alias>
-   ```
-
-   Set `LMS_API_KEY` — this is the **backend API key** that protects your LMS endpoints (used for `Authorization: Bearer` in Swagger and the frontend). It is **not** the LLM key — that comes later in Task 1.
+6. Set `LMS_API_KEY` — this is the **backend API key** that protects your LMS endpoints (used for `Authorization: Bearer` in Swagger and the frontend). It is **not** the LLM key — that comes later in Task 1.
 
    ```text
    LMS_API_KEY=set-it-to-something-and-remember-it
    ```
 
-   Save and exit: `Ctrl+X`, then `y`, then `Enter`.
-
-#### 1.4.3. Start the services (on the VM)
+### 1.3. Start the services locally
 
 1. Start the services in the background:
 
@@ -199,11 +127,11 @@ We refer to your fork as `fork` and to the original repo as `upstream`.
 
    </details>
 
-### 1.5. Populate the database
+### 1.4. Populate the database
 
 The database starts empty. You need to run the ETL pipeline to populate it with data from the autochecker API.
 
-1. Open in a browser: `http://<your-vm-ip>:42002/docs`
+1. Open in a browser: `http://localhost:42002/docs`
 
    You should see the Swagger UI page.
 
@@ -228,13 +156,13 @@ The database starts empty. You need to run the ETL pipeline to populate it with 
 
    You should get a non-empty array of items.
 
-### 1.6. Verify the deployment
+### 1.5. Verify the local deployment
 
-1. Open `http://<your-vm-ip>:42002/docs` in a browser.
+1. Open `http://localhost:42002/docs` in a browser.
 
    You should see the Swagger UI with all endpoints.
 
-2. Open `http://<your-vm-ip>:42002/` in a browser.
+2. Open `http://localhost:42002/` in a browser.
 
    You should see the frontend. Enter your API key to connect.
 
@@ -244,11 +172,11 @@ The database starts empty. You need to run the ETL pipeline to populate it with 
 
 > [!IMPORTANT]
 > If the dashboard shows no data or errors, make sure:
-> - The ETL sync completed successfully (step 1.5)
+> - The ETL sync completed successfully (step 1.4)
 > - You entered the correct API key in the frontend
 > - Try selecting a different lab in the dropdown (e.g., `lab-04`)
 
-### 1.7. Coding agent
+### 1.6. Coding agent
 
 > [!NOTE]
 > You should already have a coding agent from Lab 5.

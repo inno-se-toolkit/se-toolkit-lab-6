@@ -88,10 +88,6 @@ Add 5 regression tests for the documentation agent. Example questions:
 - `"What files are in the wiki?"` → expects `list_files` in tool_calls.
 - `"What is a Docker volume?"` → expects `read_file` in tool_calls, `wiki/docker` in source.
 
-### 5. Deployment
-
-Deploy the updated agent to your VM. Make sure `.env.agent.secret` is configured on the VM.
-
 ## Acceptance criteria
 
 - [ ] `plans/task-2.md` exists with the implementation plan (committed before code).
@@ -102,5 +98,4 @@ Deploy the updated agent to your VM. Make sure `.env.agent.secret` is configured
 - [ ] Tools do not access files outside the project directory.
 - [ ] `AGENT.md` documents the tools and agentic loop.
 - [ ] 5 tool-calling regression tests exist and pass.
-- [ ] The agent works on the VM via SSH.
 - [ ] [Git workflow](../../../wiki/git-workflow.md): issue `[Task] The Documentation Agent`, branch, PR with `Closes #...`, partner approval, merge.
