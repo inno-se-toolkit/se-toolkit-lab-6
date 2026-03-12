@@ -1,6 +1,8 @@
 # Add Tools
 
-Extend your agent with tools so it can read files, list directories, and query your deployed API.
+In Task 1 you built a CLI that calls an LLM — but it can only answer from the knowledge baked into its training data or your system prompt. It cannot look at your actual code or query your running API. That is the difference between a chatbot and an **agent**: an agent has **tools** — functions it can call to interact with the real world, then reason about the results.
+
+In this task you will give your agent three tools (`read_file`, `list_files`, `query_api`) and build the **agentic loop**: the LLM decides which tool to call, your code executes it, feeds the result back, and the LLM decides what to do next — call another tool or give the final answer.
 
 ## [Git workflow](../../../wiki/git-workflow.md)
 
