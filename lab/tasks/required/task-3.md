@@ -64,7 +64,6 @@ Fix the failing question, re-run, move on to the next one.
 
 | Symptom | Likely cause | Fix |
 |---------|-------------|-----|
-| Wrong factual answer | System prompt missing this topic | Add the topic to your system prompt |
 | Agent doesn't use a tool when it should | Tool description too vague for the LLM | Improve the tool's description in the schema |
 | Tool called but returns an error | Bug in tool implementation | Fix the tool code, test it in isolation |
 | Tool called with wrong arguments | LLM misunderstands the schema | Clarify parameter descriptions |
