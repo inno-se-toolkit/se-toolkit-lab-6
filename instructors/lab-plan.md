@@ -16,7 +16,7 @@
 | Deterministic first, open-ended later | Task 2 has deterministic answers (wiki sections). Task 3 starts with static system facts, then adds data-dependent queries and hidden chain questions. |
 | Learn by debugging, not by one-shotting | Students iterate against a benchmark. They see what fails, diagnose why, fix it, re-run. |
 | Specify interfaces, not implementations | We define CLI input/output format, tool schemas, eval criteria. How they build the agent is up to them. |
-| Build on what exists | The agent operates on their deployed lab 5 system. No new infrastructure. |
+| Build on what exists | The agent operates on the lab's own backend running locally via Docker Compose. No VM deployment. |
 
 ## Feedback addressed
 
@@ -73,9 +73,8 @@ Students create `agent.py` in the project root. It takes a question as a CLI arg
 **Acceptance criteria:**
 
 - `agent.py` outputs valid JSON with `answer` and `tool_calls`.
-- API key stored in `.env.agent.secret`, not hardcoded.
-- AGENT.md documents the solution. 5 regression tests pass.
-- Agent works on the VM via SSH.
+- API key stored in `.env.agent.secret`, not hardcoded. LLM config read from env vars.
+- AGENT.md documents the solution. 1 regression test passes.
 - PR merged closing the linked issue.
 
 ---
@@ -95,8 +94,8 @@ Students implement the agentic loop: send the question + tool definitions to the
 - `read_file` and `list_files` defined as tool schemas.
 - Agentic loop executes tool calls and feeds results back.
 - `source` identifies the wiki section that answers the question.
-- Tools restricted to project directory. AGENT.md updated. 5 more tests.
-- Agent works on the VM. PR merged closing the linked issue.
+- Tools restricted to project directory. AGENT.md updated. 2 more tests.
+- PR merged closing the linked issue.
 
 ---
 
@@ -115,9 +114,9 @@ Students add a `query_api` tool (HTTP requests to deployed backend, authenticate
 - `query_api` authenticates with the backend.
 - Agent answers static system and data-dependent questions correctly.
 - `uv run run_eval.py` passes all local questions.
-- Autochecker bot benchmark ≥75%.
+- Autochecker bot benchmark ≥75% (clone_and_run with Groq on Hetzner).
 - AGENT.md documents final architecture and lessons learned.
-- 5 more tests. PR merged closing the linked issue.
+- 2 more tests. PR merged closing the linked issue.
 
 ---
 
@@ -144,19 +143,76 @@ Students document their chosen extension in a plan, implement it, and write test
 
 ---
 
+## Infrastructure constraints
+
+See [`autochecker/docs/infrastructure.md`](../../../autochecker/docs/infrastructure.md) for course-wide constraints (dev server, relay, university VMs, LLM API availability).
+
+### Lab 6 implications
+
+**No VM deployment.** Students run everything locally. Autochecker clones their repo on Hetzner, spins up their Docker Compose (backend + DB), and runs the agent with our Groq key. The `query_api` tool hits `localhost:42002` on Hetzner where we started their backend. No relay needed for eval.
+
+**LLM key strategy:**
+
+| Who | Key | Provider | Where it runs |
+|-----|-----|----------|--------------|
+| Student (local dev) | Their own OpenRouter key (free tier, 50 RPD) | OpenRouter | Student's machine |
+| Student (`run_eval.py`) | Same OpenRouter key | OpenRouter | Student's machine |
+| Autochecker (grading) | Our Groq key | Groq (`llama-3.1-8b-instant`) | Hetzner (clone_and_run) |
+
+The student's `agent.py` must read `LLM_API_KEY`, `LLM_API_BASE`, `LLM_MODEL` from **environment variables** (not hardcoded). The `.env.agent.secret` file is a local convenience. The autochecker injects its own Groq credentials when running the agent.
+
+**clone_and_run eval flow (task 3):**
+
+```
+Hetzner (autochecker):
+  1. git clone student repo (shallow)
+  2. Create .env.docker.secret with known credentials
+  3. docker compose up --build -d (backend + postgres)
+  4. Wait for healthy, POST /pipeline/sync (populate DB)
+  5. For each eval question:
+     LLM_API_KEY=groq_key \
+     LLM_API_BASE=https://api.groq.com/openai/v1 \
+     LLM_MODEL=llama-3.1-8b-instant \
+     LMS_API_KEY=known_key \
+     AGENT_API_BASE_URL=http://localhost:42002 \
+     python agent.py "question"
+  6. Check answers against expected (matching, LLM judge)
+  7. docker compose down -v
+  8. Clean up cloned repo
+```
+
+**What we check without running code (tasks 1-2):**
+
+For tasks 1-2, we only do repo-level checks (no execution). This avoids burning student's LLM API quota and running untrusted code unnecessarily.
+
+| Check type | What it verifies | Examples |
+|-----------|-----------------|---------|
+| `file_nonempty` | Deliverable files exist | `plans/task-1.md`, `agent.py`, `AGENT.md` |
+| `regex_in_file` | Code structure | `read_file` appears 2+ times in agent.py |
+| `glob_exists` | Test files exist | `test_*.py` or `tests/test_*.py` |
+| `issue_exists` | Git workflow | Issue with correct title |
+| `issue_has_linked_pr` | Git workflow | PR closes the issue, is merged |
+| `issue_pr_approved` | Code review | PR has ≥1 approval |
+| `commit_message_regex` | Commit conventions | Starts with `feat:` |
+
+Task 3 execution checks (clone_and_run) implicitly validate that tasks 1-2 work correctly — if `agent.py` doesn't output valid JSON or tools don't work, eval questions fail.
+
 ## Architecture
 
 ```
-Student's VM:
-  agent.py (CLI) ←→ OpenRouter API (free LLM, tool calling)
+Student's machine (local development):
+  agent.py (CLI) ←→ OpenRouter API (free LLM)
        │
        ├── read_file(path)   → wiki/, source code, config
        ├── list_files(dir)   → wiki/, directories
-       └── query_api(path)   → localhost:42002 (deployed backend)
+       └── query_api(path)   → localhost:42002 (local Docker Compose)
 
-Autochecker:
-  SSH → uv run agent.py "question" → stdout JSON
-  Compare answer against expected → PASS / FAIL
+Autochecker (Hetzner, clone_and_run for task 3):
+  1. Clone student repo
+  2. docker compose up (backend + DB on Hetzner)
+  3. Populate DB (POST /pipeline/sync)
+  4. For each question: inject Groq env vars → python agent.py "question"
+  5. Check answers → docker compose down → clean up
 ```
 
 ## LLM access
@@ -389,12 +445,13 @@ Open-ended questions where keyword matching isn't sufficient.
 
 ### Two paths
 
-| | Local (`run_eval.py`) | Bot (autochecker SSH) |
-|--|----------------------|----------------------|
+| | Local (`run_eval.py`) | Bot (autochecker, clone_and_run) |
+|--|----------------------|--------------------------------|
 | Triggered by | Student runs locally | `/check` in Telegram |
-| Questions | ~26 (from API) | ~26 + ~13-17 hidden |
-| Where agent runs | Student's machine | Student's VM (via SSH) |
-| Display | Green pass, stop at first fail | Same |
+| Questions | 10 local (from API) | 10 local + 10 hidden |
+| Where agent runs | Student's machine | Hetzner (cloned repo + Docker Compose) |
+| LLM key | Student's OpenRouter (free tier) | Our Groq key (injected via env vars) |
+| Backend | Student's local Docker Compose | Cloned Docker Compose on Hetzner |
 | On failure shows | `feedback` hint (not expected value) | Same |
 | Purpose | Fast iteration | Grading |
 
@@ -494,6 +551,11 @@ This is a better model of real-world debugging (errors are often silent to the u
 | 14 | 2 planted non-critical bugs producing 500 errors for Task 3 Class D questions. |
 | 15 | LLM judge budget: ~$3 total for 60 students. |
 | 16 | `run_eval.py` supports `--index N` for single-question debugging. |
+| 17 | No VM deployment — students develop locally, autochecker evaluates via clone_and_run on Hetzner. |
+| 18 | Agent reads LLM config from env vars (`LLM_API_KEY`, `LLM_API_BASE`, `LLM_MODEL`). `.env.agent.secret` is convenience only. |
+| 19 | Autochecker uses Groq (`llama-3.1-8b-instant`) for eval, not student's OpenRouter key. |
+| 20 | Tasks 1-2: repo-level checks only (no code execution). Task 3: clone_and_run with full eval. |
+| 21 | `AGENT_API_BASE_URL` env var for query_api base URL (defaults to `http://localhost:42002`). |
 
 ## Remaining work
 
@@ -519,13 +581,12 @@ This is a better model of real-world debugging (errors are often silent to the u
 - [x] Add `llm_judge` checking to engine (uses OpenRouter, llama-4-scout:free).
 - [x] Deploy autochecker with Class D/E questions and LLM judge.
 
-**Remaining (high priority):**
+**Remaining:**
 
 - [ ] **Replace tier 1 conceptual questions with Class A wiki-lookup questions.** Current tier 1 (index 0-16) tests LLM knowledge, not wiki tools. Need questions with `expected_source` and `check_tools: [read_file]` that verify the documentation agent actually navigates the wiki. Requires wiki content to exist first.
 - [ ] Audit existing wiki content — what's there, what's missing.
 - [ ] Write missing wiki sections (labs 1-6 material).
-
-**Remaining:**
-
-- [ ] Deploy updated backend with planted bugs to student VMs.
+- [ ] **Implement `agent_eval` clone_and_run mode in autochecker engine.** Clone repo, docker compose up, populate DB, run agent with injected Groq env vars, evaluate answers, tear down. Must not break existing SSH-based `agent_eval`.
+- [ ] **Update `lab-06.yaml`** — remove SSH/VM checks from setup and tasks 1-2, add clone_and_run eval for task 3.
+- [ ] **Update task-3.md** — remove VM deployment section, add env var requirements (`LLM_API_KEY`, `LLM_API_BASE`, `LLM_MODEL`, `AGENT_API_BASE_URL` from env vars).
 - [ ] Add logging framework to backend + `/logs` endpoint (future — see planted bugs section).

@@ -35,63 +35,20 @@ Update your system prompt so the LLM knows when to use wiki tools vs `query_api`
 
 > **Note:** Two distinct keys: `LMS_API_KEY` (in `.env.docker.secret`) protects your backend endpoints. `LLM_API_KEY` (in `.env.agent.secret`) authenticates with your LLM provider. Don't mix them up.
 
-## Deploy to your VM
+## Environment variables
 
-Before running the benchmark, deploy your application to the VM so the autochecker can query your API.
+Your agent must read all configuration from **environment variables**, not hardcoded values. The `.env.agent.secret` and `.env.docker.secret` files are local conveniences — the autochecker will inject its own values when evaluating your agent.
 
-### Clean up the previous lab
+| Variable | Purpose | Source |
+|----------|---------|--------|
+| `LLM_API_KEY` | LLM provider API key | `.env.agent.secret` |
+| `LLM_API_BASE` | LLM API endpoint URL | `.env.agent.secret` |
+| `LLM_MODEL` | Model name | `.env.agent.secret` |
+| `LMS_API_KEY` | Backend API key for `query_api` auth | `.env.docker.secret` |
+| `AGENT_API_BASE_URL` | Base URL for `query_api` (default: `http://localhost:42002`) | Optional, defaults to localhost |
 
-1. [Connect to your VM](../../../wiki/vm.md#connect-to-the-vm).
-2. Navigate to the previous lab's project directory:
-
-   ```terminal
-   cd ~/se-toolkit-lab-5
-   ```
-
-3. Stop and remove all containers and volumes:
-
-   ```terminal
-   docker compose --env-file .env.docker.secret down -v
-   ```
-
-4. Go back to the home directory:
-
-   ```terminal
-   cd ~
-   ```
-
-> [!NOTE]
-> If you didn't do Lab 5, try `cd ~/se-toolkit-lab-4` instead.
-> If neither directory exists, skip the cleanup.
-
-### Deploy the application
-
-1. Clone your fork on the VM:
-
-   ```terminal
-   cd ~
-   git clone https://github.com/<your-github-username>/se-toolkit-lab-6.git
-   cd se-toolkit-lab-6
-   ```
-
-2. Create and configure the environment file:
-
-   ```terminal
-   cp .env.docker.example .env.docker.secret
-   nano .env.docker.secret
-   ```
-
-   Set your autochecker API credentials and `LMS_API_KEY` (same values as your local `.env.docker.secret`).
-
-   Save and exit: `Ctrl+X`, then `y`, then `Enter`.
-
-3. Start the services:
-
-   ```terminal
-   docker compose --env-file .env.docker.secret up --build -d
-   ```
-
-4. Populate the database — open `http://<your-vm-ip>:42002/docs`, authorize with your `LMS_API_KEY`, and call `POST /pipeline/sync`.
+> [!IMPORTANT]
+> The autochecker runs your agent with different LLM credentials and a different backend URL. If you hardcode any of these values, your agent will fail the autochecker evaluation.
 
 ## Pass the benchmark
 
@@ -152,22 +109,17 @@ Add 2 regression tests for system agent tools. Example questions:
 - `"What framework does the backend use?"` → expects `read_file` in tool_calls.
 - `"How many items are in the database?"` → expects `query_api` in tool_calls.
 
-### 5. Deployment
-
-Deploy the final agent to your VM. Make sure both `.env.agent.secret` (LLM key) and `.env.docker.secret` (backend API key) are configured on the VM.
-
-The autochecker will run the full benchmark including hidden questions. You need at least **75%** to pass.
-
 ## Acceptance criteria
 
 - [ ] `plans/task-3.md` exists with the implementation plan and benchmark diagnosis.
 - [ ] `agent.py` defines `query_api` as a function-calling schema.
-- [ ] `query_api` authenticates with `LMS_API_KEY`.
+- [ ] `query_api` authenticates with `LMS_API_KEY` from environment variables.
+- [ ] The agent reads all LLM config (`LLM_API_KEY`, `LLM_API_BASE`, `LLM_MODEL`) from environment variables.
+- [ ] The agent reads `AGENT_API_BASE_URL` from environment variables (defaults to `http://localhost:42002`).
 - [ ] The agent answers static system questions correctly (framework, ports, status codes).
 - [ ] The agent answers data-dependent questions with plausible values.
 - [ ] `run_eval.py` passes all 10 local questions.
 - [ ] `AGENT.md` documents the final architecture and lessons learned (at least 200 words).
 - [ ] 2 tool-calling regression tests exist and pass.
-- [ ] The application is deployed and running on the VM.
 - [ ] The agent passes the autochecker bot benchmark (≥75%).
 - [ ] [Git workflow](../../../wiki/git-workflow.md): issue `[Task] The System Agent`, branch, PR with `Closes #...`, partner approval, merge.
