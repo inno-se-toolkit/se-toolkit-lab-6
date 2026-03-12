@@ -76,6 +76,13 @@ Fix the failing question, re-run, move on to the next one.
 > [!NOTE]
 > The autochecker tests your agent with 10 additional hidden questions not present in `run_eval.py`. These include multi-step challenges that require chaining tools (e.g., query an API error, then read the source code to diagnose the bug). You need a genuinely working agent — not hard-coded answers.
 
+> [!NOTE]
+> **How the autochecker scores your agent:**
+> - Locally, `run_eval.py` checks answers with simple keyword matching.
+> - The autochecker bot uses the same keyword checks, but for open-ended reasoning questions (e.g., "explain the request lifecycle") it uses **LLM-based judging** with a rubric — a stricter and more accurate evaluation.
+> - The bot also verifies that your agent used the **correct tools** (e.g., `query_api` for data questions, `read_file` for code questions).
+> - You need **≥75% overall** (local + hidden questions combined) to pass.
+
 ### Debugging workflow
 
 | Symptom | Likely cause | Fix |

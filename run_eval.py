@@ -13,6 +13,13 @@ Reads from .env (same credentials as the autochecker):
     AUTOCHECKER_API_URL  — e.g. https://auche.namaz.live
     AUTOCHECKER_EMAIL    — your university email
     AUTOCHECKER_PASSWORD — your GitHub username + Telegram alias
+
+Note:
+    This runner tests your agent against the LOCAL question set only.
+    The autochecker bot tests ADDITIONAL hidden questions not shown here.
+    Some questions use LLM-based judging on the bot side for more accurate
+    scoring (locally they fall back to simple keyword matching).
+    You need >=75% overall (local + hidden) to pass.
 """
 
 import argparse
@@ -185,16 +192,24 @@ def _check_question(q: dict, data: dict) -> tuple[bool, str]:
     """Check agent output against question expectations.
 
     Returns (passed, failure_reason). failure_reason is empty on pass.
+    Checks: (1) answer keywords, (2) source reference, (3) tool usage.
     """
     answer = data.get("answer", "")
-    expected = q["expected"]
+    expected = q.get("expected", {})
 
-    if not _match(answer, expected):
-        feedback = q.get("feedback")
-        if feedback:
-            return False, f"    {YELLOW}hint: {feedback}{RESET}"
-        else:
-            return False, f"    Expected: {_format_expected(expected)}"
+    # Check answer
+    if expected:
+        if not _match(answer, expected):
+            feedback = q.get("feedback")
+            if feedback:
+                return False, f"    {YELLOW}hint: {feedback}{RESET}"
+            else:
+                return False, f"    Expected: {_format_expected(expected)}"
+    elif q.get("has_rubric"):
+        # Rubric-only question — locally we can only do a basic length check.
+        # The autochecker bot uses LLM-based judging for more accurate scoring.
+        if len(answer.split()) < 20:
+            return False, f"    {YELLOW}Answer too short for a reasoning question (bot uses LLM judge){RESET}"
 
     # Check source if expected_source is defined
     expected_source = q.get("expected_source")
@@ -208,6 +223,19 @@ def _check_question(q: dict, data: dict) -> tuple[bool, str]:
                 return False, f"    {YELLOW}hint: {feedback}{RESET}"
             else:
                 return False, f"    Source '{source}' doesn't match expected"
+
+    # Check tool usage
+    check_tools = q.get("check_tools")
+    if check_tools:
+        tool_calls = data.get("tool_calls", [])
+        tools_used = {tc.get("tool") for tc in tool_calls} if tool_calls else set()
+        missing = set(check_tools) - tools_used
+        if missing:
+            return False, (
+                f"    Expected tool calls: {', '.join(check_tools)}\n"
+                f"    Missing: {', '.join(missing)}\n"
+                f"    Your agent used: {', '.join(tools_used) or '(none)'}"
+            )
 
     return True, ""
 
@@ -268,6 +296,11 @@ def main():
         if q is None:
             # All questions done
             print(f"\n{BOLD}{GREEN}{passed}/{index} PASSED{RESET}")
+            print(
+                f"\n{YELLOW}Note: The autochecker bot tests {index} additional hidden questions"
+                f" and may use LLM-based judging for open-ended answers."
+                f" You need >=75% overall to pass.{RESET}"
+            )
             break
 
         total = q["total"]
