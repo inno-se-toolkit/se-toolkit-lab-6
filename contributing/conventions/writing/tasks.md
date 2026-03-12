@@ -1,7 +1,10 @@
 # Task conventions — applies to `lab/tasks/` only
 
-- [1. Task document template](#1-task-document-template)
-  - [1.1. Key rules for task documents](#11-key-rules-for-task-documents)
+- [1. Task document templates](#1-task-document-templates)
+  - [1.1. Imperative template (step-by-step)](#11-imperative-template-step-by-step)
+  - [1.2. Declarative template (outcome-based)](#12-declarative-template-outcome-based)
+  - [1.3. Choosing a template](#13-choosing-a-template)
+  - [1.4. Key rules for imperative task documents](#14-key-rules-for-imperative-task-documents)
 - [2. Commit message format](#2-commit-message-format)
 - [3. Steps with sub-steps](#3-steps-with-sub-steps)
 - [4. Task design principles](#4-task-design-principles)
@@ -46,7 +49,13 @@
 - [6. Testing pattern](#6-testing-pattern)
 - [7. Checklist before publishing](#7-checklist-before-publishing)
 
-## 1. Task document template
+## 1. Task document templates
+
+Two valid task styles exist: **imperative** (step-by-step) and **declarative** (outcome-based). Both are first-class — choose based on the task's learning goals.
+
+### 1.1. Imperative template (step-by-step)
+
+Best for: tasks where the learning is in the process itself — exploring a system, following a debugging workflow, deploying infrastructure. Students who skip steps miss the lesson.
 
 Every task file (`task-N.md`) must follow this structure:
 
@@ -123,7 +132,63 @@ Title: `[Task] <Task title>`
 - ...
 ```
 
-### 1.1. Key rules for task documents
+### 1.2. Declarative template (outcome-based)
+
+Best for: tasks where the learning is in the design decisions — building a system, choosing an architecture, iterating on a solution. Prescribing every step would remove the learning. Works well when students use coding agents guided by `AGENTS.md`.
+
+```markdown
+# <Task title>
+
+<1–2 sentence description of what the student will build and why.>
+
+## What you will build/add
+
+<Description of the component, its inputs, outputs, and behavior. Include diagrams, example CLI invocations, and sample JSON output as needed.>
+
+## <Concept section> (optional, repeatable)
+
+<Background information, API references, configuration guidance, or worked examples that the student needs. Use as many concept sections as the task requires.>
+
+## Deliverables
+
+### 1. <Deliverable name> (`file-or-artifact`)
+
+<What to produce and key constraints. Enough detail to verify correctness, not so much that it prescribes the implementation.>
+
+### 2. <Deliverable name> (`file-or-artifact`)
+
+<...>
+
+## Acceptance criteria
+
+- [ ] <Criterion 1>
+- [ ] <Criterion 2>
+- ...
+```
+
+Key rules for declarative task documents:
+
+- **Describe outcomes, not steps.** Say what the artifact must do, not how to build it line by line. The student (with their coding agent) decides the implementation path.
+- **Deliverables are numbered.** Each deliverable gets a `### N.` heading with the artifact name and file path.
+- **Include enough spec to verify.** CLI interface, JSON schema, parameter names, authentication requirements — anything the autochecker or reviewer needs to confirm correctness.
+- **Concept sections provide context, not instructions.** Use them for background the student needs (API docs, key distinctions, configuration format) without turning them into step-by-step guides.
+- **Acceptance criteria remain concrete and verifiable.** Same rules as imperative tasks — binary, autochecker-compatible, traceable to deliverables.
+- **Git workflow** is a single line in acceptance criteria, not a dedicated step.
+- **`AGENTS.md` carries the pedagogical weight.** The task document defines *what*; `AGENTS.md` guides the coding agent to teach *how* (planning, testing, documentation habits).
+
+### 1.3. Choosing a template
+
+| Factor | Use imperative | Use declarative |
+|--------|---------------|-----------------|
+| Learning goal | Process and workflow mastery | Design and engineering judgment |
+| Student autonomy | Low — follow prescribed steps | High — choose approach with agent |
+| Typical tasks | Setup, exploration, debugging, deployment | Building, implementing, iterating |
+| Checkpoints | After each step | Via eval benchmarks or test suites |
+| Agent role | Optional helper | Primary collaborator guided by `AGENTS.md` |
+
+A single lab can mix both styles. Early tasks (setup, exploration) are often imperative; later tasks (build a system, iterate to pass a benchmark) are often declarative.
+
+### 1.4. Key rules for imperative task documents
 
 - **Time, Purpose, Context, Diagram, Table of contents** use `<h4>` HTML tags so they don't appear in the document's auto-generated ToC.
 - **Diagram** is required whenever the task involves actions across multiple actors or environments. Include it so students understand the overall task flow — who does what, in what order, across which environments — before they start the steps. Omit only for simple, single-environment tasks where the flow is self-evident from the steps alone. Use a `mermaid` fenced code block with `sequenceDiagram`. Place it between Context and Table of contents. Use Mermaid for sequence/flow diagrams (actions across actors and environments, e.g., Developer → Local → VM → GitHub). Use `.drawio.svg` (see [Diagrams](./common.md#413-diagrams)) for architecture or structural diagrams that need to be editable and reused across files. In sequence diagrams: use `actor` for human roles (e.g., `actor Developer`) and `participant` for systems. Use `Note over <first>,<last>: <label>` to mark phase boundaries in multi-part tasks (e.g., `Note over Developer,VM: Part A — Explore the API`).
@@ -362,13 +427,15 @@ Separate concerns into different tasks only when they produce fundamentally diff
 
 ### 4.16. LLM-independence
 
-Tasks must be completable without LLMs unless the task explicitly states that students must use an AI. This means:
+**Imperative tasks** must be completable without LLMs unless the task explicitly states that students must use an AI. This means:
 
 - Provide placeholder templates, clear examples, and explicit step-by-step guidance.
 - Use simple, direct language in student-facing materials.
 - Provide fallback methods for every major operation.
 - The "Learning advice" section encourages LLM use for understanding, but tasks must not require it.
 - When a step's primary path requires AI use, add an `(AI)` suffix to its title (e.g., `#### 1.4.2. Implement the pipeline (AI)`). This lets students and reviewers instantly distinguish AI-required steps from AI-optional ones.
+
+**Declarative tasks** may assume coding agent use when the lab's learning objective is agentic engineering itself. In this case, `AGENTS.md` provides pedagogical guardrails (planning, explanation, incremental testing) so the agent teaches rather than just generates code. The task document still provides enough specification (CLI interface, JSON schema, acceptance criteria) that a student without an agent could complete it — but the expected workflow involves agent collaboration.
 
 ### 4.17. Multi-bug debugging tasks
 
@@ -591,14 +658,21 @@ See [Every task teaches something](#42-every-task-teaches-something).
 - Does the **Context** explain *why* this task matters to a working engineer?
 - Does the task content actually deliver on the stated Purpose?
 
-### 5.2. D2. Step-by-step completeness
+### 5.2. D2. Step-by-step completeness (imperative) / Specification completeness (declarative)
 
-See [Step-by-step instructions](#43-step-by-step-instructions).
+**Imperative tasks** — see [Step-by-step instructions](#43-step-by-step-instructions):
 
 - Is every action a single, concrete instruction a beginner can execute?
 - Are there compound instructions hiding multiple actions in one step? (e.g., "Open the file and change the value and save")
 - Are there ambiguous verbs without a clear target? (e.g., "Update the configuration" with no file path or key name)
 - Are there prerequisite assumptions not covered by earlier tasks or `setup.md`?
+
+**Declarative tasks** — see [Declarative template](#12-declarative-template-outcome-based):
+
+- Is the CLI interface fully specified (input, output format, field names)?
+- Are deliverables concrete enough to verify (file paths, schemas, parameter names)?
+- Does the task provide enough context (concept sections, examples) for the student to make informed design decisions?
+- Are there hidden assumptions that neither the task nor `AGENTS.md` addresses?
 
 ### 5.3. D3. Student navigation
 
@@ -644,8 +718,8 @@ See [Provide fallback methods](#44-provide-fallback-methods), [Hints and solutio
 
 See [LLM-independence](#416-llm-independence).
 
-- Is the task completable without an LLM? If it requires AI use, is that stated explicitly?
-- Are placeholders, examples, and step-by-step guidance sufficient for a student who doesn't use AI assistance?
+- **Imperative tasks:** Is the task completable without an LLM? If it requires AI use, is that stated explicitly? Are placeholders, examples, and step-by-step guidance sufficient for a student who doesn't use AI assistance?
+- **Declarative tasks:** Is the specification detailed enough that a student could complete it without an agent (even if harder)? Does `AGENTS.md` provide pedagogical guardrails so the agent teaches rather than just generates?
 
 ### 5.9. D9. Git workflow coherence
 

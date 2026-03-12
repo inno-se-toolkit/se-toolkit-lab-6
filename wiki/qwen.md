@@ -134,6 +134,10 @@ Method 2:
 4. Click `Auto` (`Pick Model`).
 5. Click `Qwen 3 Coder Plus`.
 
+## Lab instructions for `Qwen Code`
+
+`Qwen Code` automatically reads `AGENTS.md` in the project root. This file contains instructions that guide the agent to help you learn — not just generate code. The agent will ask you questions, help you plan, and encourage you to write code yourself.
+
 ## Chat with `Qwen Code`
 
 Actions:

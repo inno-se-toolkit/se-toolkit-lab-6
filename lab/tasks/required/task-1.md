@@ -74,9 +74,9 @@ Create `agent.py` in the project root. The system prompt can be minimal for now 
 
 Create `AGENT.md` in the project root documenting how the agent works, which LLM provider you chose, and how to run it.
 
-### 4. Tests (5 tests)
+### 4. Tests (1 test)
 
-Create 5 regression tests that run `agent.py` as a subprocess, parse the stdout JSON, and check that `answer` and `tool_calls` are present.
+Create 1 regression test that runs `agent.py` as a subprocess, parses the stdout JSON, and checks that `answer` and `tool_calls` are present.
 
 ## Acceptance criteria
 
@@ -85,5 +85,5 @@ Create 5 regression tests that run `agent.py` as a subprocess, parse the stdout 
 - [ ] `uv run agent.py "..."` outputs valid JSON with `answer` and `tool_calls`.
 - [ ] The API key is stored in `.env.agent.secret` (not hardcoded).
 - [ ] `AGENT.md` documents the solution architecture.
-- [ ] 5 regression tests exist and pass.
+- [ ] 1 regression test exists and passes.
 - [ ] [Git workflow](../../../wiki/git-workflow.md): issue `[Task] Call an LLM from Code`, branch, PR with `Closes #...`, partner approval, merge.

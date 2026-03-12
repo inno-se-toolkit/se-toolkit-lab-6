@@ -145,9 +145,9 @@ Add `query_api` as a function-calling schema, implement it with authentication, 
 
 Update `AGENT.md` to document the `query_api` tool, its authentication, how the LLM decides between wiki and system tools, lessons learned from the benchmark, and your final eval score. At least 200 words.
 
-### 4. Tests (5 more tests)
+### 4. Tests (2 more tests)
 
-Add 5 regression tests for system agent tools. Example questions:
+Add 2 regression tests for system agent tools. Example questions:
 
 - `"What framework does the backend use?"` → expects `read_file` in tool_calls.
 - `"How many items are in the database?"` → expects `query_api` in tool_calls.
@@ -167,7 +167,7 @@ The autochecker will run the full benchmark including hidden questions. You need
 - [ ] The agent answers data-dependent questions with plausible values.
 - [ ] `run_eval.py` passes all 10 local questions.
 - [ ] `AGENT.md` documents the final architecture and lessons learned (at least 200 words).
-- [ ] 5 tool-calling regression tests exist and pass.
+- [ ] 2 tool-calling regression tests exist and pass.
 - [ ] The application is deployed and running on the VM.
 - [ ] The agent passes the autochecker bot benchmark (≥75%).
 - [ ] [Git workflow](../../../wiki/git-workflow.md): issue `[Task] The System Agent`, branch, PR with `Closes #...`, partner approval, merge.
