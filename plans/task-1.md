@@ -22,3 +22,8 @@
  - Make API call to OpenRouter
  - Parse response
  - Print response
+ - Write regression test
+
+ ## 4. Testing
+
+ - Run `test_agent.py` to check that `agent.py` works as expected.
