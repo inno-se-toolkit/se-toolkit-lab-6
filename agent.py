@@ -82,6 +82,7 @@ if __name__ == "__main__":
         get_env()
         prompt = get_user_input()
         print(send_request(prompt))
+        exit(0)
     except Exception as e:
         print(f"Error: {e}")
         exit(1)
