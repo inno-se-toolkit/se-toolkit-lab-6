@@ -78,7 +78,7 @@ tools = [
         "type": "function",
         "function": {
             "name": "list_files",
-            "description": "List files and directories at a given path relative to the project root. Useful for discovering documentation in 'wiki/' or source code in 'backend/'.",
+            "description": "List files and directories at a given path relative to the project root.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -92,7 +92,7 @@ tools = [
         "type": "function",
         "function": {
             "name": "read_file",
-            "description": "Read the content of a file given its relative path from the project root. Use this to find answers in documentation or to inspect source code for system facts.",
+            "description": "Read the content of a file given its relative path from the project root.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -115,6 +115,21 @@ tools = [
                     "body": {"type": "string", "description": "Optional JSON request body as a string."}
                 },
                 "required": ["method", "path"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "submit_answer",
+            "description": "Submit your final answer once you have gathered enough information from tools.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "answer": {"type": "string", "description": "The concise answer to the user's question."},
+                    "source": {"type": "string", "description": "The source file and section anchor (e.g. 'wiki/git.md#merge-conflict'). Use 'unknown' or omit if no file source applies."}
+                },
+                "required": ["answer"]
             }
         }
     }
@@ -152,19 +167,18 @@ def main():
                 "4. For bug diagnosis, query the API, read the error message, and then inspect the relevant source code files. "
                 "CRITICAL: ALWAYS use `list_files` first to explore directories, and then `read_file` to read the content. "
                 "DO NOT provide an answer without using `read_file` on a relevant file if the question is about specific content. "
-                "Your final response MUST BE ONLY A JSON OBJECT. NO MARKDOWN, NO EXPLANATIONS. "
-                "Format: {\"answer\": \"your concise answer here\", \"source\": \"wiki/filename.md#section-anchor\"}"
+                "To provide a final answer, you MUST call the `submit_answer` tool. "
+                "Before submitting, ensure you have used `list_files` and `read_file` to verify facts from the repository."
             )
         },
         {"role": "user", "content": question}
     ]
     
     all_tool_calls_history = []
+    final_output = None
     
     for _ in range(10):
         try:
-            # For the first call, we can suggest tools, but for subsequent calls,
-            # we want the LLM to either use a tool or provide the FINAL answer in JSON.
             response = client.chat.completions.create(
                 model=model,
                 messages=messages,
@@ -176,34 +190,10 @@ def main():
             tool_calls = response_message.tool_calls
             
             if not tool_calls:
-                content = response_message.content or ""
-                # Attempt to parse the content as JSON
-                try:
-                    # Robust parsing: find the first '{' and last '}'
-                    start_idx = content.find('{')
-                    end_idx = content.rfind('}')
-                    if start_idx != -1 and end_idx != -1:
-                        json_str = content[start_idx:end_idx+1]
-                        final_data = json.loads(json_str)
-                    else:
-                        raise ValueError("No JSON found")
-                    
-                    answer = final_data.get("answer", content)
-                    source = final_data.get("source")
-                except:
-                    # Fallback: create JSON if LLM failed to do so
-                    answer = content
-                    source = None
-                
-                output = {
-                    "answer": answer,
-                    "tool_calls": all_tool_calls_history
-                }
-                if source:
-                    output["source"] = source
-                    
-                print(json.dumps(output))
-                return
+                if response_message.content:
+                    final_output = {"answer": response_message.content, "tool_calls": all_tool_calls_history}
+                    break
+                continue
             
             messages.append(response_message)
             
@@ -211,6 +201,14 @@ def main():
                 function_name = tool_call.function.name
                 function_args = json.loads(tool_call.function.arguments)
                 
+                if function_name == "submit_answer":
+                    final_output = {
+                        "answer": function_args.get("answer"),
+                        "source": function_args.get("source", "unknown"),
+                        "tool_calls": all_tool_calls_history
+                    }
+                    break
+
                 if function_name == "list_files":
                     result = list_files(function_args.get("path"))
                 elif function_name == "read_file":
@@ -236,15 +234,21 @@ def main():
                     "name": function_name,
                     "content": str(result),
                 })
+            
+            if final_output:
+                break
                 
         except Exception as e:
             print(f"Error in agent loop: {e}", file=sys.stderr)
             sys.exit(1)
             
-    print(json.dumps({
-        "answer": "Reached maximum tool calls without finding a definitive answer.",
-        "tool_calls": all_tool_calls_history
-    }))
+    if not final_output:
+        final_output = {
+            "answer": "Reached maximum tool calls without finding a definitive answer.",
+            "tool_calls": all_tool_calls_history
+        }
+        
+    print(json.dumps(final_output))
 
 if __name__ == "__main__":
     main()
