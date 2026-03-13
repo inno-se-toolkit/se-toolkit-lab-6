@@ -7,6 +7,33 @@ from dotenv import load_dotenv
 load_dotenv(".env.agent.secret")
 
 
+
+def list_files(path):
+    try:
+        base = os.getcwd()
+        full = os.path.abspath(os.path.join(base, path))
+
+        if not full.startswith(base):
+            return "Access denied"
+
+        return "\n".join(os.listdir(full))
+    except Exception as e:
+        return str(e)
+
+
+def read_file(path):
+    try:
+        base = os.getcwd()
+        full = os.path.abspath(os.path.join(base, path))
+
+        if not full.startswith(base):
+            return "Access denied"
+
+        with open(full, "r", encoding="utf-8") as f:
+            return f.read()
+    except Exception as e:
+        return str(e)
+
 def main():
     if len(sys.argv) < 2:
         print("No question provided", file=sys.stderr)
@@ -63,3 +90,34 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "list_files",
+            "description": "List files in a directory",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string"}
+                },
+                "required": ["path"]
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "read_file",
+            "description": "Read file contents",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string"}
+                },
+                "required": ["path"]
+            },
+        },
+    },
+]
