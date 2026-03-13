@@ -48,13 +48,11 @@ def main():
     cl = OpenAI(api_key=os.getenv("LLM_API_KEY"), base_url=os.getenv("LLM_API_BASE"))
     m = os.getenv("LLM_MODEL", "qwen3-coder-plus")
     q = sys.argv[1] if len(sys.argv) > 1 else "Hi"
-    msgs = [{"role": "system", "content": "You are a System Agent. ALWAYS use tools first. To answer, MUST return ONLY a JSON: {\"answer\": \"string\", \"source\": \"wiki/file.md#anchor\"}. No other text."}, {"role": "user", "content": q}]
+    msgs = [{"role": "system", "content": "You are a System Agent. ALWAYS use tools. NEVER guess. To answer, MUST return ONLY a JSON: {\"answer\": \"string\", \"source\": \"wiki/file.md#anchor\"}. No other text."}, {"role": "user", "content": q}]
     hist = []
     for i in range(15):
         try:
-            # Force tool usage if no tools used yet
-            tc_choice = "required" if i == 0 else "auto"
-            resp = cl.chat.completions.create(model=m, messages=msgs, tools=tools, tool_choice=tc_choice)
+            resp = cl.chat.completions.create(model=m, messages=msgs, tools=tools)
             msg = resp.choices[0].message
             if not msg.tool_calls:
                 txt = msg.content or ""
