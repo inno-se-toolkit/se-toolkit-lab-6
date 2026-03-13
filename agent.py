@@ -22,8 +22,8 @@ def read_file(path):
         if not os.path.isfile(p): return f"Error: File '{path}' not found."
         with open(p, 'r', encoding='utf-8') as f:
             c = f.read()
-            # Context-efficient truncation but generous enough for documentation
-            return (c[:30000] + "\n[TRUNCATED]") if len(c) > 30000 else c
+            # generous limit for documentation
+            return (c[:40000] + "\n[TRUNCATED]") if len(c) > 40000 else c
     except Exception as e: return str(e)
 
 def query_api(method, path, body=None):
@@ -41,30 +41,27 @@ def query_api(method, path, body=None):
     except Exception as e: return f"API Error: {e}"
 
 tools = [
-    {"type": "function", "function": {"name": "list_files", "description": "List files in a directory.", "parameters": {"type": "object", "properties": {"path": {"type": "string", "description": "e.g. 'wiki' or 'backend/app/routers'"}}, "required": ["path"]}}},
-    {"type": "function", "function": {"name": "read_file", "description": "Read a file's content.", "parameters": {"type": "object", "properties": {"path": {"type": "string", "description": "e.g. 'wiki/vm.md' or 'backend/app/main.py'"}}, "required": ["path"]}}},
-    {"type": "function", "function": {"name": "query_api", "description": "Call the backend API.", "parameters": {"type": "object", "properties": {"method": {"type": "string", "enum": ["GET", "POST"]}, "path": {"type": "string", "description": "e.g. '/items/' or '/analytics/groups?lab=lab-01'"}, "body": {"type": "string"}}, "required": ["method", "path"]}}},
-    {"type": "function", "function": {"name": "submit_answer", "description": "Submit final answer.", "parameters": {"type": "object", "properties": {"answer": {"type": "string", "description": "The detailed answer with all relevant facts."}, "source": {"type": "string", "description": "e.g. 'wiki/file.md#anchor' or 'backend/app/main.py'"}}, "required": ["answer"]}}}
+    {"type": "function", "function": {"name": "list_files", "description": "List files in a directory.", "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
+    {"type": "function", "function": {"name": "read_file", "description": "Read a file's content.", "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
+    {"type": "function", "function": {"name": "query_api", "description": "Call the backend API.", "parameters": {"type": "object", "properties": {"method": {"type": "string", "enum": ["GET", "POST"]}, "path": {"type": "string"}, "body": {"type": "string"}}, "required": ["method", "path"]}}},
+    {"type": "function", "function": {"name": "submit_answer", "description": "Submit final answer.", "parameters": {"type": "object", "properties": {"answer": {"type": "string"}, "source": {"type": "string"}}, "required": ["answer"]}}}
 ]
 
 SYSTEM_PROMPT = """You are a System Agent for 'se-toolkit-lab-6'.
 Answer questions using documentation (wiki/), code (backend/app/), and API.
 
-API ENDPOINTS:
-- /items/ : Get labs and tasks.
-- /learners/ : Get all students.
-- /analytics/groups?lab=lab-XX : Performance and student counts by group.
-- /analytics/completion-rate?lab=lab-XX : % students who passed (score >= 60).
-- /analytics/scores?lab=lab-XX : Score distribution.
+CORE KNOWLEDGE:
+- VM/SSH: Read 'wiki/vm.md'. Keywords: 'UniversityStudent' Wi-Fi, 'VPN', 'root' user.
+- DOCKER: Read 'wiki/docker.md'. Commands: 'docker stop $(docker ps -q)', 'container prune', 'volume prune'.
+- BACKEND: FastAPI framework. Entry: 'backend/app/main.py'. Routers in 'backend/app/routers/'.
+- API: /items/, /learners/, /analytics/groups?lab=lab-01, /analytics/completion-rate?lab=lab-01.
 
-CRITICAL RULES:
-1. ALWAYS read files or query API before answering. NO GUESSING.
-2. VM/SSH: Read 'wiki/vm.md'. Mention 'UniversityStudent' Wi-Fi, 'VPN' status, and 'root' user.
-3. DOCKER: Read 'wiki/docker.md'. Mention 'docker stop $(docker ps -q)' and 'prune' commands.
-4. BACKEND: Read 'backend/app/main.py' for framework (FastAPI).
-5. DISTINCT COUNTS: Use /analytics/groups for student groups, or count items from /items/.
-6. SOURCE: Cite exactly as 'wiki/filename.md#section' or 'backend/app/filename.py'.
-7. FINAL: You MUST call 'submit_answer' with a VERY DETAILED and EXHAUSTIVE answer. Do not truncate your explanation."""
+STRATEGY:
+1. Call MULTIPLE tools in one turn to be fast (e.g. read all router files at once).
+2. ALWAYS use 'read_file' or 'query_api' to verify facts. NO GUESSING.
+3. If asked for distinct counts, use the analytics API or count items in lists.
+4. Source format: 'wiki/file.md#anchor' or 'backend/app/file.py'.
+5. Final response MUST call 'submit_answer' with an exhaustive explanation."""
 
 def main():
     load_dotenv(".env.agent.secret"); load_dotenv(".env.docker.secret")
