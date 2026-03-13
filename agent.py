@@ -24,9 +24,8 @@ def read_file(path):
         if not os.path.isfile(p): return f"Error: File '{path}' not found."
         with open(p, 'r', encoding='utf-8') as f:
             content = f.read()
-            # Large enough for most files, but prevents context overflow
             if len(content) > 50000:
-                return content[:50000] + "\n\n[TRUNCATED: File is too large. Use specific search if possible.]"
+                return content[:50000] + "\n\n[TRUNCATED]"
             return content
     except Exception as e: return str(e)
 
@@ -38,19 +37,32 @@ def query_api(method, path, body=None):
     url = f"{base_url.rstrip('/')}/{path.lstrip('/')}"
     try:
         with httpx.Client(timeout=20.0) as client:
-            if method.upper() == "GET":
-                resp = client.get(url, headers=headers)
-            else:
-                resp = client.post(url, headers=headers, content=body)
+            if method.upper() == "GET": resp = client.get(url, headers=headers)
+            else: resp = client.post(url, headers=headers, content=body)
             return json.dumps({"status_code": resp.status_code, "body": resp.text})
     except Exception as e: return f"API Error: {e}"
 
 tools = [
-    {"type": "function", "function": {"name": "list_files", "description": "Discover files in a directory.", "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
-    {"type": "function", "function": {"name": "read_file", "description": "Read file content.", "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
-    {"type": "function", "function": {"name": "query_api", "description": "Call backend API.", "parameters": {"type": "object", "properties": {"method": {"type": "string", "enum": ["GET", "POST"]}, "path": {"type": "string"}, "body": {"type": "string"}}, "required": ["method", "path"]}}},
-    {"type": "function", "function": {"name": "submit_answer", "description": "Submit the final answer.", "parameters": {"type": "object", "properties": {"answer": {"type": "string"}, "source": {"type": "string"}}, "required": ["answer"]}}}
+    {"type": "function", "function": {"name": "list_files", "description": "List files in a directory.", "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
+    {"type": "function", "function": {"name": "read_file", "description": "Read a file's content.", "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
+    {"type": "function", "function": {"name": "query_api", "description": "Call the backend API.", "parameters": {"type": "object", "properties": {"method": {"type": "string", "enum": ["GET", "POST"]}, "path": {"type": "string"}, "body": {"type": "string"}}, "required": ["method", "path"]}}},
+    {"type": "function", "function": {"name": "submit_answer", "description": "Submit final answer.", "parameters": {"type": "object", "properties": {"answer": {"type": "string"}, "source": {"type": "string"}}, "required": ["answer"]}}}
 ]
+
+SYSTEM_PROMPT = """You are a System Agent for 'se-toolkit-lab-6'.
+Answer questions using documentation (wiki/), code (backend/app/), and API.
+
+RULES:
+1. Use 'list_files' to discover files.
+2. Use 'read_file' to get content. ALWAYS read the file before answering questions about its content.
+3. For VM or SSH questions, look for 'wiki/vm.md' or 'wiki/ssh.md'.
+4. For Docker questions, look for 'wiki/docker.md'.
+5. For framework/code questions, check 'backend/app/main.py' or 'pyproject.toml'.
+6. Use 'query_api' for data (e.g., item counts).
+7. Submit answer ONLY via 'submit_answer' tool.
+8. Source MUST be 'wiki/filename.md#anchor' if from wiki, or 'backend/app/file.py' if from code. Use 'unknown' only if no file applies.
+
+OUTPUT: MUST call 'submit_answer' with valid JSON fields."""
 
 def main():
     load_dotenv(".env.agent.secret")
@@ -59,10 +71,7 @@ def main():
     model = os.getenv("LLM_MODEL", "qwen3-coder-plus")
     question = sys.argv[1] if len(sys.argv) > 1 else "Hi"
     
-    msgs = [
-        {"role": "system", "content": "You are a System Agent. Use tools to verify facts. Documentation is in 'wiki/', code in 'backend/app/'. To finish, call 'submit_answer' with JSON: {\"answer\": \"...\", \"source\": \"wiki/file.md#anchor\"}."},
-        {"role": "user", "content": question}
-    ]
+    msgs = [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": question}]
     history = []
     
     for i in range(15):
@@ -71,6 +80,7 @@ def main():
             m = resp.choices[0].message
             if not m.tool_calls:
                 if m.content:
+                    # Robust fallback if it didn't call submit_answer but gave text
                     print(json.dumps({"answer": m.content, "source": "unknown", "tool_calls": history}))
                     return
                 continue
