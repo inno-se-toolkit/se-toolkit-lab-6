@@ -48,7 +48,7 @@ def main():
     cl = OpenAI(api_key=os.getenv("LLM_API_KEY"), base_url=os.getenv("LLM_API_BASE"))
     m = os.getenv("LLM_MODEL", "qwen3-coder-plus")
     q = sys.argv[1] if len(sys.argv) > 1 else "Hi"
-    msgs = [{"role": "system", "content": "You are a System Agent. ALWAYS use tools to find info. DO NOT guess. To answer, you MUST return ONLY a JSON object with 'answer' and 'source' (e.g. 'wiki/git.md#anchor'). No other text."}, {"role": "user", "content": q}]
+    msgs = [{"role": "system", "content": "You are a System Agent. ALWAYS use tools to find info. DO NOT guess. Your final response MUST be ONLY a JSON object with 'answer' (string) and 'source' (string, e.g. 'wiki/git.md#anchor'). No other text."}, {"role": "user", "content": q}]
     hist = []
     for _ in range(15):
         try:
@@ -61,21 +61,25 @@ def main():
                 if start != -1 and end != -1:
                     try:
                         data = json.loads(content[start:end+1])
-                        print(json.dumps({"answer": data.get("answer"), "source": data.get("source", "unknown"), "tool_calls": hist}))
+                        ans = data.get("answer", content)
+                        src = data.get("source", "unknown")
+                        if isinstance(ans, list): ans = ", ".join(map(str, ans))
+                        print(json.dumps({"answer": str(ans), "source": str(src), "tool_calls": history}))
                         return
                     except: pass
-                print(json.dumps({"answer": content, "source": "unknown", "tool_calls": hist}))
+                print(json.dumps({"answer": content, "source": "unknown", "tool_calls": history}))
                 return
             msgs.append(msg)
             for tc in msg.tool_calls:
                 fn = tc.function.name
                 try: args = json.loads(tc.function.arguments)
-                except: args = {"path": "unknown"} # Fallback for malformed args
+                except: args = {"path": "unknown"}
                 res = list_files(args.get("path", ".")) if fn=="list_files" else \
                       read_file(args.get("path", "")) if fn=="read_file" else \
                       query_api(args.get("method", "GET"), args.get("path", ""), args.get("body")) if fn=="query_api" else "Error"
                 hist.append({"tool": fn, "args": args, "result": str(res)})
-                msgs.append({"tool_call_id": tc.id, "role": "tool", "name": fn, "content": str(res)})
+                messages_to_add = {"tool_call_id": tc.id, "role": "tool", "name": fn, "content": str(res)}
+                msgs.append(messages_to_add)
         except Exception as e:
             print(json.dumps({"answer": f"Error: {e}", "tool_calls": hist}))
             return
