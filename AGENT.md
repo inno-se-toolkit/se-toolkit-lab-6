@@ -2,12 +2,17 @@
 
 ## Overview
 
-This agent is a CLI tool that connects to an LLM (Qwen Code API) and returns structured JSON answers to user questions. It forms the foundation for the more advanced agent with tools that will be built in Tasks 2-3.
+This agent is a CLI tool that connects to an LLM (Qwen Code API) with tools to navigate the project wiki. It implements an agentic loop that allows the LLM to call tools (`read_file`, `list_files`) to find answers in the documentation.
 
 ## Architecture
 
 ```
-User question (CLI arg) → agent.py → LLM API → JSON answer (stdout)
+User question → LLM + tool schemas → tool call? → execute tool → append result → back to LLM
+                                         │
+                                         no
+                                         │
+                                         ▼
+                                    JSON output with answer + source
 ```
 
 ## Components
@@ -20,21 +25,128 @@ Loads configuration from `.env.agent.secret` using `pydantic-settings`:
 - `LLM_API_BASE` — Base URL of the LLM endpoint
 - `LLM_MODEL` — Model name to use
 
-### 2. LLM Client (`call_llm`)
+### 2. Tools
+
+Two tools are available to the LLM:
+
+#### `read_file`
+Reads a file from the project repository.
+
+- **Parameters:** `path` (string) — relative path from project root
+- **Returns:** File contents as string, or error message
+- **Security:** Validates path doesn't escape project directory
+
+#### `list_files`
+Lists files and directories at a given path.
+
+- **Parameters:** `path` (string) — relative directory path from project root
+- **Returns:** Newline-separated listing of entries, or error message
+- **Security:** Validates path doesn't escape project directory
+
+### 3. Tool Schemas
+
+Tools are defined as OpenAI-compatible function calling schemas:
+
+```python
+TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "read_file",
+            "description": "Read the contents of a file...",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "..."}
+                },
+                "required": ["path"]
+            }
+        }
+    },
+    # ... list_files
+]
+```
+
+### 4. Agentic Loop (`run_agentic_loop`)
+
+The core loop that enables tool use:
+
+1. **Send question + tool definitions** to LLM
+2. **Parse response:**
+   - If `tool_calls` present → execute each tool, append results as `tool` role messages, repeat
+   - If text message (no tool calls) → extract answer and source, return
+3. **Maximum 10 tool calls** per question (safety limit)
+
+### 5. Message History
+
+Conversation history is maintained throughout the loop:
+
+```python
+messages = [
+    {"role": "system", "content": SYSTEM_PROMPT},
+    {"role": "user", "content": question},
+    # After tool call:
+    {"role": "tool", "content": result, "tool_call_id": "..."},
+]
+```
+
+### 6. LLM Client (`call_llm`)
 
 Makes HTTP POST requests to the OpenAI-compatible chat completions endpoint:
 
 - **Endpoint:** `{LLM_API_BASE}/chat/completions`
 - **Timeout:** 60 seconds
-- **Request format:** Standard OpenAI chat completions API
-- **Response parsing:** Extracts `choices[0].message.content`
+- **Request format:** Standard OpenAI chat completions API with optional `tools`
+- **Response parsing:** Extracts `choices[0].message` with content and tool_calls
 
-### 3. CLI Interface (`main`)
+### 7. CLI Interface (`main`)
 
 - Parses command-line arguments (question as first argument)
 - Validates settings file exists
-- Calls the LLM and formats the response
+- Runs the agentic loop
 - Outputs JSON to stdout, debug info to stderr
+
+## System Prompt Strategy
+
+The system prompt guides the LLM to:
+
+1. Use `list_files` to discover wiki files
+2. Use `read_file` to read relevant file contents
+3. Find the specific section that answers the question
+4. Include a source reference in the format `wiki/filename.md#section-anchor`
+5. Be concise and accurate
+
+```python
+SYSTEM_PROMPT = """You are a helpful documentation assistant. You have access to tools...
+
+When answering questions:
+1. Use `list_files` to discover what files exist in the wiki
+2. Use `read_file` to read the contents of relevant files
+3. Find the specific section that answers the question
+4. Include a source reference in your answer using the format: `wiki/filename.md#section-anchor`
+...
+"""
+```
+
+## Path Security
+
+To prevent reading files outside the project directory:
+
+```python
+def validate_path(relative_path: str) -> Path:
+    project_root = Path(__file__).parent.resolve()
+    full_path = (project_root / relative_path).resolve()
+    
+    # Check for path traversal
+    try:
+        full_path.relative_to(project_root)
+    except ValueError:
+        raise ValueError(f"Path traversal not allowed: {relative_path}")
+    
+    return full_path
+```
+
+This ensures that even if the LLM tries to access `../../etc/passwd`, the path will be rejected.
 
 ## LLM Provider
 
@@ -52,10 +164,17 @@ Makes HTTP POST requests to the OpenAI-compatible chat completions endpoint:
 
 ```bash
 # Basic usage
-uv run agent.py "What does REST stand for?"
+uv run agent.py "How do you resolve a merge conflict?"
 
 # Output (stdout)
-{"answer": "Representational State Transfer.", "tool_calls": []}
+{
+  "answer": "Edit the conflicting file, choose which changes to keep, then stage and commit.",
+  "source": "wiki/git-workflow.md#resolving-merge-conflicts",
+  "tool_calls": [
+    {"tool": "list_files", "args": {"path": "wiki"}, "result": "git-workflow.md\n..."},
+    {"tool": "read_file", "args": {"path": "wiki/git-workflow.md"}, "result": "..."}
+  ]
+}
 ```
 
 ## Output Format
@@ -65,12 +184,20 @@ The agent outputs a single JSON line to stdout:
 ```json
 {
   "answer": "The LLM's response text",
-  "tool_calls": []
+  "source": "wiki/filename.md#section-anchor",
+  "tool_calls": [
+    {
+      "tool": "read_file",
+      "args": {"path": "wiki/filename.md"},
+      "result": "..."
+    }
+  ]
 }
 ```
 
 - `answer`: The text response from the LLM
-- `tool_calls`: Empty array for Task 1 (will be populated in Task 2)
+- `source`: The wiki section reference (extracted from answer using regex)
+- `tool_calls`: Array of all tool calls made, each with `tool`, `args`, and `result`
 
 **Important:** Only valid JSON goes to stdout. All debug/progress output goes to stderr.
 
@@ -96,9 +223,11 @@ LLM_MODEL=qwen3-coder-plus
 - HTTP errors → raised as exceptions with details to stderr
 - Invalid LLM response format → exit code 1 with parsing error to stderr
 - Timeout (>60s) → httpx timeout exception
+- Path traversal attempt → error message returned as tool result
+- Max tool calls (10) reached → warning to stderr, partial answer returned
 
 ## Dependencies
 
 - `httpx` — HTTP client for API requests
 - `pydantic-settings` — Environment variable parsing
-- Standard library: `json`, `os`, `sys`, `pathlib`
+- Standard library: `json`, `os`, `sys`, `pathlib`, `re`
