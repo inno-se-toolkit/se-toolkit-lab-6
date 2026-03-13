@@ -20,27 +20,69 @@ from pydantic_settings import BaseSettings
 
 
 class AgentSettings(BaseSettings):
-    """Settings loaded from .env.agent.secret."""
+    """Settings loaded from environment variables."""
 
+    # LLM configuration (from .env.agent.secret)
     llm_api_key: str
     llm_api_base: str
     llm_model: str
 
+    # Backend API configuration
+    # LMS_API_KEY from .env.docker.secret (or environment)
+    lms_api_key: str = ""
+    # AGENT_API_BASE_URL from environment (default: http://localhost:42002)
+    agent_api_base_url: str = "http://localhost:42002"
+
     model_config = {
         "env_file": Path(__file__).parent / ".env.agent.secret",
         "env_file_encoding": "utf-8",
+        "extra": "ignore",  # Ignore extra env vars not defined here
     }
 
 
 def load_settings() -> AgentSettings:
-    """Load and validate settings."""
-    env_file = Path(__file__).parent / ".env.agent.secret"
-    if not env_file.exists():
-        print(f"Error: {env_file} not found", file=sys.stderr)
+    """Load and validate settings from multiple env files."""
+    project_root = Path(__file__).parent
+
+    # Load .env.agent.secret for LLM config
+    env_agent_file = project_root / ".env.agent.secret"
+    if not env_agent_file.exists():
+        print(f"Error: {env_agent_file} not found", file=sys.stderr)
         print("Copy .env.agent.example to .env.agent.secret and fill in your credentials", file=sys.stderr)
         sys.exit(1)
 
-    return AgentSettings()
+    # Load .env.docker.secret for backend API config (if exists)
+    env_docker_file = project_root / ".env.docker.secret"
+    if env_docker_file.exists():
+        # Manually parse and load .env.docker.secret
+        for line in env_docker_file.read_text().splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            if key and key not in os.environ:
+                os.environ[key] = value
+
+    settings = AgentSettings()
+
+    # LMS_API_KEY and AGENT_API_BASE_URL can also come from environment
+    if not settings.lms_api_key:
+        settings.lms_api_key = os.environ.get("LMS_API_KEY", "")
+    if settings.agent_api_base_url == "http://localhost:42002":
+        settings.agent_api_base_url = os.environ.get("AGENT_API_BASE_URL", "http://localhost:42002")
+
+    print(f"Using LLM: {settings.llm_model} at {settings.llm_api_base}", file=sys.stderr)
+    print(f"Backend API: {settings.agent_api_base_url}", file=sys.stderr)
+    if settings.lms_api_key:
+        print(f"LMS API Key: [configured]", file=sys.stderr)
+    else:
+        print(f"LMS API Key: [not set - query_api will fail without auth]", file=sys.stderr)
+
+    return settings
 
 
 def validate_path(relative_path: str) -> Path:
@@ -94,10 +136,10 @@ def read_file(path: str) -> str:
 def list_files(path: str) -> str:
     """
     List files and directories at a given path.
-    
+
     Args:
         path: Relative directory path from project root
-        
+
     Returns:
         Newline-separated listing of entries, or error message
     """
@@ -107,7 +149,7 @@ def list_files(path: str) -> str:
             return f"Error: Directory not found: {path}"
         if not validated_path.is_dir():
             return f"Error: Not a directory: {path}"
-        
+
         entries = []
         for entry in sorted(validated_path.iterdir()):
             suffix = "/" if entry.is_dir() else ""
@@ -117,6 +159,68 @@ def list_files(path: str) -> str:
         return f"Error: {e}"
     except Exception as e:
         return f"Error listing directory: {e}"
+
+
+def query_api(method: str, path: str, body: str | None = None, settings: AgentSettings | None = None) -> str:
+    """
+    Send an HTTP request to the backend API.
+
+    Args:
+        method: HTTP method (GET, POST, PUT, DELETE, etc.)
+        path: API endpoint path (e.g., /items/, /analytics/completion-rate)
+        body: Optional JSON request body for POST/PUT requests
+        settings: Agent settings for API key and base URL
+
+    Returns:
+        JSON string with status_code and body, or error message
+    """
+    if settings is None:
+        settings = load_settings()
+
+    base_url = settings.agent_api_base_url.rstrip("/")
+    url = f"{base_url}{path}"
+
+    headers = {
+        "Content-Type": "application/json",
+    }
+
+    # Add authentication header
+    if settings.lms_api_key:
+        headers["X-API-Key"] = settings.lms_api_key
+
+    print(f"Querying API: {method} {url}", file=sys.stderr)
+
+    try:
+        with httpx.Client(timeout=30.0) as client:
+            kwargs = {"headers": headers}
+            if body:
+                kwargs["content"] = body
+
+            response = client.request(method, url, **kwargs)
+
+            result = {
+                "status_code": response.status_code,
+                "body": response.text,
+            }
+
+            # Try to parse JSON response
+            try:
+                result["body"] = response.json()
+            except (json.JSONDecodeError, ValueError):
+                pass  # Keep as text
+
+            return json.dumps(result)
+
+    except httpx.HTTPError as e:
+        return json.dumps({
+            "status_code": getattr(e.response, "status_code", 0) if hasattr(e, "response") else 0,
+            "error": str(e),
+        })
+    except Exception as e:
+        return json.dumps({
+            "status_code": 0,
+            "error": f"Error querying API: {e}",
+        })
 
 
 # Tool definitions for LLM function calling
@@ -154,6 +258,31 @@ TOOLS = [
                 "required": ["path"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "query_api",
+            "description": "Send an HTTP request to the backend API. Use this to query runtime data from the system, such as item counts, scores, analytics, or to check HTTP status codes. Do NOT use for wiki documentation questions.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "method": {
+                        "type": "string",
+                        "description": "HTTP method (GET, POST, PUT, DELETE, etc.)"
+                    },
+                    "path": {
+                        "type": "string",
+                        "description": "API endpoint path (e.g., '/items/', '/analytics/completion-rate')"
+                    },
+                    "body": {
+                        "type": "string",
+                        "description": "Optional JSON request body for POST/PUT requests"
+                    }
+                },
+                "required": ["method", "path"]
+            }
+        }
     }
 ]
 
@@ -161,19 +290,30 @@ TOOLS = [
 TOOL_FUNCTIONS = {
     "read_file": read_file,
     "list_files": list_files,
+    "query_api": query_api,
 }
 
 
-SYSTEM_PROMPT = """You are a helpful documentation assistant. You have access to tools that let you read files and list directories in a project wiki.
+SYSTEM_PROMPT = """You are a helpful documentation assistant. You have access to tools that let you read files, list directories, and query the backend API.
 
 When answering questions:
-1. Use `list_files` to discover what files exist in the wiki
-2. Use `read_file` to read the contents of relevant files
-3. Find the specific section that answers the question
-4. Include a source reference in your answer using the format: `wiki/filename.md#section-anchor`
-5. Be concise and accurate
+1. For wiki/documentation questions (e.g., "according to the wiki", "what steps", "how to"):
+   - Use `list_files` to discover what files exist in the wiki
+   - Use `read_file` to read the contents of relevant files
+   - Include a source reference in your answer using the format: `wiki/filename.md#section-anchor`
+
+2. For source code questions (e.g., "what framework", "what does this code do"):
+   - Use `read_file` to read the relevant source code files
+   - Look for imports, class definitions, function names to identify patterns
+
+3. For runtime data questions (e.g., "how many items", "what status code", "query the API"):
+   - Use `query_api` to send HTTP requests to the backend
+   - Specify the correct HTTP method (usually GET for queries)
+   - Specify the correct path (e.g., `/items/`, `/analytics/completion-rate`)
+   - Authentication is handled automatically
 
 Always use tools to find the answer - don't make up information.
+Be concise and accurate.
 """
 
 
@@ -226,27 +366,32 @@ def call_llm(
     return result
 
 
-def execute_tool(tool_call: dict) -> str:
+def execute_tool(tool_call: dict, settings: AgentSettings) -> str:
     """
     Execute a tool call and return the result.
-    
+
     Args:
         tool_call: Dict with 'function' containing 'name' and 'arguments'
-        
+        settings: Agent settings (needed for query_api authentication)
+
     Returns:
         Tool result as string
     """
     function = tool_call["function"]
     name = function["name"]
     args = json.loads(function["arguments"])
-    
+
     print(f"Executing tool: {name}({args})", file=sys.stderr)
-    
+
     if name not in TOOL_FUNCTIONS:
         return f"Error: Unknown tool: {name}"
-    
+
     try:
-        result = TOOL_FUNCTIONS[name](**args)
+        # Pass settings for query_api which needs authentication
+        if name == "query_api":
+            result = TOOL_FUNCTIONS[name](settings=settings, **args)
+        else:
+            result = TOOL_FUNCTIONS[name](**args)
         return result
     except Exception as e:
         return f"Error executing tool: {e}"
@@ -282,8 +427,8 @@ def run_agentic_loop(question: str, settings: AgentSettings) -> tuple[str, str, 
         if response["tool_calls"]:
             for tool_call in response["tool_calls"]:
                 # Execute the tool
-                result = execute_tool(tool_call)
-                
+                result = execute_tool(tool_call, settings)
+
                 # Log the tool call
                 tool_call_entry = {
                     "tool": tool_call["function"]["name"],
