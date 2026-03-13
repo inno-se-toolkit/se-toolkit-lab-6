@@ -48,7 +48,7 @@ def main():
     cl = OpenAI(api_key=os.getenv("LLM_API_KEY"), base_url=os.getenv("LLM_API_BASE"))
     m = os.getenv("LLM_MODEL", "qwen3-coder-plus")
     q = sys.argv[1] if len(sys.argv) > 1 else "Hi"
-    msgs = [{"role": "system", "content": "You are a System Agent. ALWAYS use tools to find info. DO NOT guess. Your final response MUST be ONLY a JSON object with 'answer' (string) and 'source' (string, e.g. 'wiki/git.md#anchor'). No other text."}, {"role": "user", "content": q}]
+    msgs = [{"role": "system", "content": "You are a System Agent. ALWAYS use tools. Documentation is in wiki/, source code in backend/app/. Routers are in backend/app/routers/. Answer MUST be JSON: {\"answer\": \"string\", \"source\": \"wiki/file.md#anchor\"}."}, {"role": "user", "content": q}]
     hist = []
     for _ in range(15):
         try:
@@ -61,7 +61,6 @@ def main():
                     try:
                         d = json.loads(txt[s:e+1])
                         ans, src = d.get("answer", txt), d.get("source", "unknown")
-                        if isinstance(ans, list): ans = ", ".join(map(str, ans))
                         print(json.dumps({"answer": str(ans), "source": str(src), "tool_calls": hist}))
                         return
                     except: pass
