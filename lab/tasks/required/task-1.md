@@ -72,6 +72,19 @@ Edit `.env.agent.secret` and fill in `LLM_API_KEY`, `LLM_API_BASE`, and `LLM_MOD
 
 > **Note:** This is **not** the same as `LMS_API_KEY` in `.env.docker.secret`. That one protects your backend LMS endpoints. `LLM_API_KEY` authenticates with your LLM provider.
 
+## Environment variables
+
+Your agent must read all configuration from **environment variables**, not hardcoded values. The `.env.agent.secret` file is a local convenience — the autochecker will inject its own values when evaluating your agent.
+
+| Variable       | Purpose                     | Source              |
+| -------------- | --------------------------- | ------------------- |
+| `LLM_API_KEY`  | LLM provider API key        | `.env.agent.secret` |
+| `LLM_API_BASE` | LLM API endpoint URL        | `.env.agent.secret` |
+| `LLM_MODEL`    | Model name                  | `.env.agent.secret` |
+
+> [!IMPORTANT]
+> The autochecker runs your agent with different LLM credentials. If you hardcode any of these values, your agent will fail the autochecker evaluation.
+
 ## Deliverables
 
 ### 1. Plan (`plans/task-1.md`)
@@ -95,6 +108,7 @@ Create 1 regression test that runs `agent.py` as a subprocess, parses the stdout
 - [ ] `plans/task-1.md` exists with the implementation plan (committed before code).
 - [ ] `agent.py` exists in the project root.
 - [ ] `uv run agent.py "..."` outputs valid JSON with `answer` and `tool_calls`.
+- [ ] The agent reads LLM config (`LLM_API_KEY`, `LLM_API_BASE`, `LLM_MODEL`) from environment variables.
 - [ ] The API key is stored in `.env.agent.secret` (not hardcoded).
 - [ ] `AGENT.md` documents the solution architecture.
 - [ ] 1 regression test exists and passes.
