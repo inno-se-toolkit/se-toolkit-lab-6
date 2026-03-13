@@ -166,11 +166,11 @@ Type checker: `poe ty-check`
 
 #### `ESLint`
 
-Linter: `cd frontend && npm run lint`
+Linter: `cd frontend && pnpm run lint`
 
 #### `tsc`
 
-Type checker (strict, no emit): `cd frontend && npx tsc --noEmit`
+Type checker (strict, no emit): `cd frontend && pnpm exec tsc --noEmit`
 
 ### Markdown tools
 

@@ -65,7 +65,7 @@ Docs:
 
 ### `uv`
 
-`uv` is a modern package manager for [`Python`](#what-is-python).
+`uv` is a modern [package manager](./package-manager.md#what-is-a-package-manager) for [`Python`](#what-is-python).
 
 #### Install `uv`
 

@@ -243,7 +243,7 @@ Actions:
 ### Open the ERD for the database
 
 > [!NOTE]
-> See [ERD](./database.md#erd).
+> See [ERD](./database-modeling.md#erd).
 
 1. [Open the database `<db-name>`](#open-the-database).
 2. Right-click the `<db-name>`.
@@ -252,7 +252,7 @@ Actions:
 ### View the ERD in crow's foot notation
 
 > [!NOTE]
-> See [ERD in crow's foot notation](./database.md#erd-in-crows-foot-notation).
+> See [ERD in crow's foot notation](./database-modeling.md#erd-in-crows-foot-notation).
 
 1. [Open the ERD for the database `<db-name>`](#open-the-erd-for-the-database).
 2. Click `Cardinality Notation`.
@@ -265,7 +265,7 @@ Actions:
 ### View the ERD in Chen notation
 
 > [!NOTE]
-> See [ERD in Chen notation](./database.md#erd-in-chen-notation).
+> See [ERD in Chen notation](./database-modeling.md#erd-in-chen-notation).
 
 1. [Open the ERD for the database `<db-name>`](#open-the-erd-for-the-database).
 2. Click `Cardinality Notation`.

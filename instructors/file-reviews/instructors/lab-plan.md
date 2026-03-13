@@ -35,7 +35,7 @@ No issues found.
 
 1. ~~**[High]** Lines 51, 71, 90, 112 — All four task summaries are written as single paragraphs. Convention 8.4 requires "five to ten sentences split across two to four short paragraphs." **Suggested fix:** Break each summary into two to four paragraphs on natural topic boundaries (e.g., setup and exploration in one paragraph, implementation details in the next).~~
 
-2. **[Medium]** Line 71 — [Task 2 summary](../lab-plan.md#task-2--build-the-observability-cli) contains only 4 sentences. Convention 8.4 requires five to ten sentences. **Suggested fix:** Add one to six sentences to expand on what the student does (e.g., describe argument handling, the reference pattern, or how the two subcommands differ).
+2. **[Medium]** Line 71 — [Task 2 summary](../../lab-plan.md#task-2--the-documentation-agent) contains only 4 sentences. Convention 8.4 requires five to ten sentences. **Suggested fix:** Add one to six sentences to expand on what the student does (e.g., describe argument handling, the reference pattern, or how the two subcommands differ).
 
 ### D8. Practical feasibility
 

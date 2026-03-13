@@ -21,6 +21,7 @@
 ## What is `Nix`
 
 `Nix` is a cross-platform [package manager](./package-manager.md#package) that provides reproducible, isolated software [environments](./environments.md#what-is-an-environment).
+
 It allows you to install [tools](./package-manager.md#tool) and [dependencies](./package-manager.md#dependency) without affecting the rest of your system.
 
 Many of the packages are available in [`nixpkgs`](#nixpkgs).

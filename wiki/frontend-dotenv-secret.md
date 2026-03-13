@@ -9,7 +9,7 @@
 
 `frontend/.env.secret` is an [`.env` file](./environments.md#env-file) that stores [environment variables](./environments.md#environment-variable) for the `Vite` dev server.
 
-`Vite` loads the values when running `npm run dev`.
+`Vite` loads the values when running `pnpm run dev`.
 
 Docs:
 

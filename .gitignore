@@ -13,4 +13,4 @@ __pycache__/
 
 tmp
 
-.agents/settings.local.json
+**/settings.local.json

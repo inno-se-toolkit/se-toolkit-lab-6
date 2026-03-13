@@ -25,6 +25,7 @@
   - [`Wi-Fi` network](#wi-fi-network)
 - [URL](#url)
   - [Components of a URL](#components-of-a-url)
+    - [Query parameter](#query-parameter)
   - [URL example](#url-example)
 - [Troubleshooting](#troubleshooting)
   - [Service is running but a request fails](#service-is-running-but-a-request-fails)
@@ -185,8 +186,12 @@ A typical URL consists of several components:
 - **[Host](#host)/Domain**: The server where the resource is located (e.g., `www.example.com`).
 - **[Port](#port)** (optional): The specific port number on the server (e.g., `:8080`).
 - **Path**: The location of the specific resource on the server (e.g., `/folder/page.html`).
-- **Query parameters** (optional): Additional data passed to the server (e.g., `?param1=value1&param2=value2`).
+- **[Query parameters](#query-parameter)** (optional): Additional data passed to the server (e.g., `?param1=value1&param2=value2`).
 - **Fragment** (optional): Points to a specific section within the resource (e.g., `#section1`).
+
+#### Query parameter
+
+Query parameters are key-value pairs appended to a [URL](./computer-networks.md#url) after a `?` character, used to send data to the server with a request.
 
 ### URL example
 

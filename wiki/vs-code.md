@@ -343,7 +343,7 @@ Method 2:
 ### (`Windows` only) Switch to the `Linux` shell for the `VS Code Terminal`
 
 > [!NOTE]
-> See [`Linux` shell](./shell.md#linix-shell).
+> See [`Linux` shell](./shell.md#linux-shell).
 
 1. Make sure you can [run `VS Code` in `WSL`](#windows-only-set-up-running-vs-code-in-wsl).
 2. [Reopen the directory in `WSL`](#windows-only-reopen-the-directory-in-wsl)

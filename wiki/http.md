@@ -7,9 +7,8 @@
 - [`HTTPS`](#https)
 - [`HTTP` request](#http-request)
   - [`HTTP` request method](#http-request-method)
-- [`HTTP` request header](#http-request-header)
+  - [`HTTP` request header](#http-request-header)
   - [`HTTP` request payload](#http-request-payload)
-  - [Query parameter](#query-parameter)
 - [`HTTP` response](#http-response)
 - [`HTTP` response status code](#http-response-status-code)
 - [Common `HTTP` response status codes](#common-http-response-status-codes)
@@ -55,9 +54,9 @@ It encrypts the communication between a [web client](./web-infrastructure.md#web
 
 An `HTTP` request is a message sent by a client to a server asking for resources or to perform actions. It includes a method, headers, and optional body.
 
-<!-- TODO image -->
+<img alt="HTTP Request text" src="./images/http/http-request-text.png" style="width:400px"></img>
 
-<!-- https://www.cloud4y.ru/upload/medialibrary/4c0/hn5x5w7tx2pa0t3m1us71vh51dthf4kg/2.jpg -->
+[[Source](https://www.cloud4y.ru/upload/medialibrary/4c0/hn5x5w7tx2pa0t3m1us71vh51dthf4kg/2.jpg)]
 
 ### `HTTP` request method
 
@@ -70,17 +69,21 @@ Common methods:
 - `PUT` — update an existing resource.
 - `DELETE` — remove a resource.
 
-## `HTTP` request header
+### `HTTP` request header
 
-<!-- TODO -->
+`HTTP` request headers are key-value pairs sent alongside a request that provide metadata — such as the format of the data being sent, what response formats the client accepts, or authentication credentials.
+
+Common headers:
+
+- `Content-Type` — the format of the [request payload](#http-request-payload) (e.g., `application/json`).
+- `Authorization` — credentials used to authenticate the request (e.g., an API key or token).
+- `Accept` — the response formats the client can handle (e.g., `application/json`).
 
 ### `HTTP` request payload
 
-<!-- TODO -->
+An `HTTP` request payload (also called the request body) is optional data sent with a request. Methods such as `POST` and `PUT` use a payload to send data to the server — for example, a `JSON` object when creating a new resource.
 
-### Query parameter
-
-Query parameters are key-value pairs appended to a [URL](./computer-networks.md#url) after a `?` character, used to send data to the server with a request.
+The [`Content-Type`](#http-request-header) header tells the server how to interpret the payload.
 
 ## `HTTP` response
 

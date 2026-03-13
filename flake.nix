@@ -29,11 +29,22 @@
             commandGroups = {
               "1-front-tools" = [
                 pkgs.nodejs_25
+                pkgs.pnpm
               ];
               "2-back-tools" = [
                 pkgs.uv
               ];
-              "3-lint-scripts" = [
+              "3-lint-tools" = [
+                pkgs.lychee
+              ];
+              "4-instructors" = [
+                {
+                  name = "process-meeting-transcript";
+                  command = ''
+                    ${pkgs.lib.getExe python} ${./instructors/scripts/process-meeting-transcript/process-meeting-transcript.py} "$@"
+                  '';
+                  help = "Process a meeting transcript directory into speaker-labelled text files";
+                }
                 {
                   name = "find-broken-links";
                   command = ''
@@ -63,21 +74,9 @@
                       '#**/node_modules' \
                       '#*/skills' \
                       '#tmp' \
-                      '#instructors/{file-reviews,meetings,scripts}'
+                      '#instructors/{file-reviews,meetings,scripts,lab-plan.md}'
                   '';
                   help = "Lint all Markdown files";
-                }
-              ];
-              "4-lint-tools" = [
-                pkgs.lychee
-              ];
-              "5-instructors" = [
-                {
-                  name = "process-meeting-transcript";
-                  command = ''
-                    ${pkgs.lib.getExe python} ${./instructors/scripts/process-meeting-transcript/process-meeting-transcript.py} "$@"
-                  '';
-                  help = "Process a meeting transcript directory into speaker-labelled text files";
                 }
               ];
             };

@@ -39,12 +39,12 @@ Update your system prompt so the LLM knows when to use wiki tools vs `query_api`
 
 Your agent must read all configuration from **environment variables**, not hardcoded values. The `.env.agent.secret` and `.env.docker.secret` files are local conveniences — the autochecker will inject its own values when evaluating your agent.
 
-| Variable | Purpose | Source |
-|----------|---------|--------|
-| `LLM_API_KEY` | LLM provider API key | `.env.agent.secret` |
-| `LLM_API_BASE` | LLM API endpoint URL | `.env.agent.secret` |
-| `LLM_MODEL` | Model name | `.env.agent.secret` |
-| `LMS_API_KEY` | Backend API key for `query_api` auth | `.env.docker.secret` |
+| Variable             | Purpose                                                      | Source                          |
+| -------------------- | ------------------------------------------------------------ | ------------------------------- |
+| `LLM_API_KEY`        | LLM provider API key                                         | `.env.agent.secret`             |
+| `LLM_API_BASE`       | LLM API endpoint URL                                         | `.env.agent.secret`             |
+| `LLM_MODEL`          | Model name                                                   | `.env.agent.secret`             |
+| `LMS_API_KEY`        | Backend API key for `query_api` auth                         | `.env.docker.secret`            |
 | `AGENT_API_BASE_URL` | Base URL for `query_api` (default: `http://localhost:42002`) | Optional, defaults to localhost |
 
 > [!IMPORTANT]
@@ -78,6 +78,7 @@ Fix the failing question, re-run, move on to the next one.
 
 > [!NOTE]
 > **How the autochecker scores your agent:**
+>
 > - Locally, `run_eval.py` checks answers with simple keyword matching.
 > - The autochecker bot uses the same keyword checks, but for open-ended reasoning questions (e.g., "explain the request lifecycle") it uses **LLM-based judging** with a rubric — a stricter and more accurate evaluation.
 > - The bot also verifies that your agent used the **correct tools** (e.g., `query_api` for data questions, `read_file` for code questions).
@@ -85,15 +86,15 @@ Fix the failing question, re-run, move on to the next one.
 
 ### Debugging workflow
 
-| Symptom | Likely cause | Fix |
-|---------|-------------|-----|
-| Agent doesn't use a tool when it should | Tool description too vague for the LLM | Improve the tool's description in the schema |
-| Tool called but returns an error | Bug in tool implementation | Fix the tool code, test it in isolation |
-| Tool called with wrong arguments | LLM misunderstands the schema | Clarify parameter descriptions |
-| Agent times out | Too many tool calls or slow LLM | Reduce max iterations, try a faster model |
-| Agent crashes with `AttributeError: 'NoneType'` | LLM returns `content: null` when it makes tool calls | Use `(msg.get("content") or "")` instead of `msg.get("content", "")` — the field is present but `null`, not missing |
-| Agent reads the same file in a loop | File is too large and gets truncated, LLM can't find the answer | Increase the content limit sent back to the LLM |
-| Answer is close but doesn't match | Phrasing doesn't contain expected keyword | Adjust system prompt to be more precise |
+| Symptom                                         | Likely cause                                                    | Fix                                                                                                                 |
+| ----------------------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Agent doesn't use a tool when it should         | Tool description too vague for the LLM                          | Improve the tool's description in the schema                                                                        |
+| Tool called but returns an error                | Bug in tool implementation                                      | Fix the tool code, test it in isolation                                                                             |
+| Tool called with wrong arguments                | LLM misunderstands the schema                                   | Clarify parameter descriptions                                                                                      |
+| Agent times out                                 | Too many tool calls or slow LLM                                 | Reduce max iterations, try a faster model                                                                           |
+| Agent crashes with `AttributeError: 'NoneType'` | LLM returns `content: null` when it makes tool calls            | Use `(msg.get("content") or "")` instead of `msg.get("content", "")` — the field is present but `null`, not missing |
+| Agent reads the same file in a loop             | File is too large and gets truncated, LLM can't find the answer | Increase the content limit sent back to the LLM                                                                     |
+| Answer is close but doesn't match               | Phrasing doesn't contain expected keyword                       | Adjust system prompt to be more precise                                                                             |
 
 ## Deliverables
 

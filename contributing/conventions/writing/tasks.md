@@ -35,7 +35,7 @@
   - [4.25. Multi-part tasks](#425-multi-part-tasks)
 - [5. Conceptual review dimensions](#5-conceptual-review-dimensions)
   - [5.1. D1. Learning objective clarity](#51-d1-learning-objective-clarity)
-  - [5.2. D2. Step-by-step completeness](#52-d2-step-by-step-completeness)
+  - [5.2. D2. Step-by-step completeness (imperative) / Specification completeness (declarative)](#52-d2-step-by-step-completeness-imperative--specification-completeness-declarative)
   - [5.3. D3. Student navigation](#53-d3-student-navigation)
   - [5.4. D4. Checkpoints and feedback loops](#54-d4-checkpoints-and-feedback-loops)
   - [5.5. D5. Acceptance criteria alignment](#55-d5-acceptance-criteria-alignment)
@@ -178,13 +178,13 @@ Key rules for declarative task documents:
 
 ### 1.3. Choosing a template
 
-| Factor | Use imperative | Use declarative |
-|--------|---------------|-----------------|
-| Learning goal | Process and workflow mastery | Design and engineering judgment |
-| Student autonomy | Low — follow prescribed steps | High — choose approach with agent |
-| Typical tasks | Setup, exploration, debugging, deployment | Building, implementing, iterating |
-| Checkpoints | After each step | Via eval benchmarks or test suites |
-| Agent role | Optional helper | Primary collaborator guided by `AGENTS.md` |
+| Factor           | Use imperative                            | Use declarative                            |
+| ---------------- | ----------------------------------------- | ------------------------------------------ |
+| Learning goal    | Process and workflow mastery              | Design and engineering judgment            |
+| Student autonomy | Low — follow prescribed steps             | High — choose approach with agent          |
+| Typical tasks    | Setup, exploration, debugging, deployment | Building, implementing, iterating          |
+| Checkpoints      | After each step                           | Via eval benchmarks or test suites         |
+| Agent role       | Optional helper                           | Primary collaborator guided by `AGENTS.md` |
 
 A single lab can mix both styles. Early tasks (setup, exploration) are often imperative; later tasks (build a system, iterate to pass a benchmark) are often declarative.
 

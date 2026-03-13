@@ -3,7 +3,7 @@
 <h2>Table of contents</h2>
 
 - [What is `SSH`](#what-is-ssh)
-- [`SSH` keys](#ssh-keys)
+- [`SSH` key pair](#ssh-key-pair)
   - [`SSH` public key](#ssh-public-key)
   - [`SSH` private key](#ssh-private-key)
 - [`SSH` daemon](#ssh-daemon)
@@ -37,7 +37,7 @@ All commands below assume a Unix shell: `Bash` (`Linux`, `WSL`) or `Zsh` (`macOS
 > [!IMPORTANT]
 > **Windows users:** Use `WSL` (Windows Subsystem for Linux). Do not use `PowerShell`, `cmd.exe`, or `Git Bash` — the commands below are not guaranteed to work there.
 
-## `SSH` keys
+## `SSH` key pair
 
 `SSH` uses a key pair for authentication:
 

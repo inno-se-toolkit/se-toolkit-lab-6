@@ -25,6 +25,7 @@ Complete these steps:
 ### Install `Python` and dependencies
 
 1. [Open in `VS Code` the project directory](./vs-code.md#open-the-directory).
+
 2. To install `Python` and project dependencies,
 
    [run in the `VS Code Terminal`](./vs-code.md#run-a-command-in-the-vs-code-terminal):

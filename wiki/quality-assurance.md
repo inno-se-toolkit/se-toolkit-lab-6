@@ -87,10 +87,6 @@ Common methods:
 - [End-to-end testing](#end-to-end-test)
 - [Boundary value analysis](#boundary-value-analysis)
 
-Examples:
-
-- [Testing in `Python`](./python.md#testing)
-
 #### Assertion
 
 An assertion is a statement that checks whether a given condition is true. If the condition is false, the assertion fails and raises an error, stopping the test immediately.
@@ -104,12 +100,6 @@ Examples:
 #### Unit test
 
 A unit test verifies that an individual function or module works correctly in isolation. Unit tests are fast because they don't depend on external services like databases or network connections.
-
-In this project, unit tests are located in `backend/tests/unit/` and run with [`poe test-unit`](./pyproject-toml.md#poe-test-unit).
-
-Examples:
-
-- [Testing in `Python`](./python.md#testing)
 
 #### End-to-end test
 

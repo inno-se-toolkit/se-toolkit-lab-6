@@ -4,11 +4,13 @@
 
 - [What is a shell](#what-is-a-shell)
   - [Login shell](#login-shell)
-  - [`Linix` shell](#linix-shell)
+  - [`Linux` shell](#linux-shell)
 - [Shell variants](#shell-variants)
   - [`bash`](#bash)
-  - [`Git Bash` (`Windows`)](#git-bash-windows)
   - [`zsh`](#zsh)
+  - [`Git Bash` (`Windows`)](#git-bash-windows)
+- [Shell profile](#shell-profile)
+  - [Reload the shell profile](#reload-the-shell-profile)
 - [Shell prompt](#shell-prompt)
 - [Shell command](#shell-command)
 - [Current working directory](#current-working-directory)
@@ -31,20 +33,23 @@ It reads login-specific configuration files such as `~/.bash_profile` or `~/.pro
 > [!NOTE]
 > A `VS Code` terminal is typically a non-login shell and reads `~/.bashrc` instead.
 
-### `Linix` shell
+### `Linux` shell
 
-<!-- TODO explain better -->
+Used in the docs to refer to a [shell](#shell) opened in [`Linux`](./operating-system.md#linux).
 
-Used in the docs to refer to a shell opened in [`Linux`](./operating-system.md#linux).
-
-On [`Windows`](./operating-system.md#windows), the shell must be opened in [WSL](./operating-system.md#wsl).
+If using [`Windows`](./operating-system.md#windows), [switch to the `Linux` shell](./vs-code.md#windows-only-switch-to-the-linux-shell-for-the-vs-code-terminal).
 
 ## Shell variants
+
+<!-- no toc -->
+- [`bash`](#bash)
+- [`Git Bash` (`Windows`)](#git-bash-windows)
+- [`zsh`](#zsh)
 
 ### `bash`
 
 `Bash` (short for "Bourne Again SHell") is an interactive command interpreter and scripting language developed for `Unix`-like operating systems (e.g., [`Linux`](./linux.md#what-is-linux)).
-[[source]]
+[[source](https://en.wikipedia.org/wiki/Bash_(Unix_shell))]
 
 > [!NOTE]
 > `Bash` is the default login shell for `Ubuntu`.
@@ -56,15 +61,43 @@ On [`Windows`](./operating-system.md#windows), the shell must be opened in [WSL]
 
 See also: [`Bash`](./bash.md).
 
-### `Git Bash` (`Windows`)
-
-`Git Bash` is a terminal shipped with `Git for Windows`.
-It provides a Unix-like shell environment on Windows.
-
 ### `zsh`
 
 `zsh` is the default shell on modern `macOS` and is also common on Linux.
 Most `bash` commands in this course work in `zsh` as well.
+
+### `Git Bash` (`Windows`)
+
+`Git Bash` is a terminal shipped with `Git for Windows`.
+It provides a `Unix`-like shell environment on `Windows`.
+
+> [!IMPORTANT]
+> Don't use it in the `VS Code Terminal`.
+>
+> The terminal commands in the lab may not work outside of [`bash`](#bash) and [`zsh`](#zsh).
+>
+> [Switch to the `Linux` shell](./vs-code.md#windows-only-switch-to-the-linux-shell-for-the-vs-code-terminal).
+
+## Shell profile
+
+A shell profile is a configuration file that the shell reads automatically when it starts.
+It is used to set environment variables, define aliases, and customize the [shell](#what-is-a-shell) environment.
+
+Common profile files:
+
+- `~/.bashrc` — read by `bash` for every new non-login interactive shell (e.g., a `VS Code` terminal).
+- `~/.bash_profile` — read by `bash` for [login shells](#login-shell) (e.g., an [`SSH`](./ssh.md#what-is-ssh) session).
+- `~/.zshrc` — read by `zsh` for every new interactive shell.
+
+### Reload the shell profile
+
+1. To reload the shell profile and apply changes to the current session,
+
+   [run in the `VS Code Terminal`](./vs-code.md#run-a-command-in-the-vs-code-terminal):
+
+   ```terminal
+   source ~/.bashrc
+   ```
 
 ## Shell prompt
 

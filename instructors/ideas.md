@@ -131,7 +131,10 @@
 - move to contributing/configuration:
   - dotenv-docker-secret.md and others
   - pyproject-toml.md
-  
+- remove "In this project" because they quickly get obsolete
+- replace: `<term>` -> `<term>` placeholder
+- agents.md - explain based on <https://www.salmanq.com/blog/simplest-agent-loop/>
+
 ### Lab 5 - TODO - Docs
 
 - GitHub Pages with good full-text search
@@ -176,6 +179,8 @@
 
 - The instructions aren't guaranteed to work outside of Linux or macOS. This is why we require to use WSL
 
+- install jq via nix
+
 ### Lab 5 - TODO - Task 1
 
 - line break after the curl command
@@ -218,8 +223,9 @@
 - meeting report
   
   date and deadline in separate sections
-- review which conventions aren't mentioned anywhere or mentioned without a markdown link
+- review which conventions aren't mentioned anywhere or mentioned without a markdown llink
 - the autochecker -> `Autochecker`
+- review: mark deliverables that are hard to produce without following specific steps.
 
 ### Lab 5 - DONE - Skills
 

@@ -3,19 +3,25 @@
 <h2>Table of contents</h2>
 
 - [What is `Node.js`](#what-is-nodejs)
-- [`nvm`](#nvm)
-  - [Install `nvm`](#install-nvm)
 - [Install `Node.js`](#install-nodejs)
   - [Install `Node.js` using `nvm`](#install-nodejs-using-nvm)
   - [Install `Node.js` using the commands from the official site](#install-nodejs-using-the-commands-from-the-official-site)
+  - [Install `Node.js` using `Nix`](#install-nodejs-using-nix)
 - [Check that `Node.js` works](#check-that-nodejs-works)
-- [`npm`](#npm)
+- [`nvm`](#nvm)
+  - [Install `nvm`](#install-nvm)
+- [Package managers for `Node.js`](#package-managers-for-nodejs)
   - [`package.json`](#packagejson)
   - [`node_modules`](#node_modules)
-- [Common `npm` commands](#common-npm-commands)
-  - [`npm install`](#npm-install)
-- [Common `npm` actions](#common-npm-actions)
-  - [Install `Node.js` dependencies in the directory](#install-nodejs-dependencies-in-the-directory)
+- [`npm`](#npm)
+- [`pnpm`](#pnpm)
+  - [Install `pnpm`](#install-pnpm)
+    - [Install `pnpm` via the official installer script](#install-pnpm-via-the-official-installer-script)
+    - [Install `pnpm` via `Nix`](#install-pnpm-via-nix)
+  - [Common `pnpm` commands](#common-pnpm-commands)
+    - [`pnpm install`](#pnpm-install)
+  - [Common `pnpm` actions](#common-pnpm-actions)
+    - [Install `Node.js` dependencies in the directory](#install-nodejs-dependencies-in-the-directory)
 
 ## What is `Node.js`
 
@@ -25,40 +31,11 @@ Docs:
 
 - [Node.js documentation](https://nodejs.org/en/docs)
 
-## `nvm`
-
-`nvm` (Node Version Manager) is a tool for installing and switching between multiple versions of [`Node.js`](#what-is-nodejs).
-
-See [Install `nvm`](#install-nvm).
-
-Docs:
-
-- [`nvm` repository](https://github.com/nvm-sh/nvm)
-
-### Install `nvm`
-
-1. Copy the single-line script from the [installation instructions](https://github.com/nvm-sh/nvm#installing-and-updating).
-
-2. [Run the copied script in the `VS Code Terminal`](./vs-code.md#run-a-command-in-the-vs-code-terminal).
-
-3. To check that [`nvm`](#nvm) is installed,
-
-   [run in the `VS Code Terminal`](./vs-code.md#run-a-command-in-the-vs-code-terminal):
-
-   ```terminal
-   nvm --version
-   ```
-
-   The output should be similar to this:
-
-   ```terminal
-   0.40.3
-   ```
-
 ## Install `Node.js`
 
 - Method 1: [Install `Node.js` using `nvm`](#install-nodejs-using-nvm)
 - Method 2: [Install `Node.js` using the commands from the official site](#install-nodejs-using-the-commands-from-the-official-site)
+- Method 3: [Install `Node.js` using `Nix`](#install-nodejs-using-nvm)
 
 ### Install `Node.js` using `nvm`
 
@@ -112,6 +89,20 @@ Docs:
 
 4. [Run the copied commands in the `VS Code Terminal`](./vs-code.md#run-a-command-in-the-vs-code-terminal).
 
+### Install `Node.js` using `Nix`
+
+1. [Install `Nix`](./nix.md#install-nix) if it's not yet installed.
+
+2. To install `Node.js` from [`nixpkgs`](./nix.md#nixpkgs),
+
+   [run in the `VS Code Terminal`](./vs-code.md#run-a-command-in-the-vs-code-terminal):
+
+   ```terminal
+   nix profile install nixpkgs#nodejs_25
+   ```
+
+3. [Check that `Node.js` works](#check-that-nodejs-works).
+
 ## Check that `Node.js` works
 
 1. [Check the current shell in the `VS Code Terminal`](./vs-code.md#check-the-current-shell-in-the-vs-code-terminal).
@@ -129,13 +120,58 @@ Docs:
    v25.7.0
    ```
 
-<!-- TODO pnpm -->
 <!-- TODO install npm with nix because when installing on the VM using nvm libatomic is missing -->
+
+## `nvm`
+
+`nvm` (Node Version Manager) is a tool for installing and switching between multiple versions of [`Node.js`](#what-is-nodejs).
+
+See [Install `nvm`](#install-nvm).
+
+Docs:
+
+- [`nvm` repository](https://github.com/nvm-sh/nvm)
+
+### Install `nvm`
+
+1. Copy the single-line script from the [installation instructions](https://github.com/nvm-sh/nvm#installing-and-updating).
+
+2. [Run the copied script in the `VS Code Terminal`](./vs-code.md#run-a-command-in-the-vs-code-terminal).
+
+3. To check that [`nvm`](#nvm) is installed,
+
+   [run in the `VS Code Terminal`](./vs-code.md#run-a-command-in-the-vs-code-terminal):
+
+   ```terminal
+   nvm --version
+   ```
+
+   The output should be similar to this:
+
+   ```terminal
+   0.40.3
+   ```
+
+## Package managers for `Node.js`
+
+- [`npm`](#npm)
+- [`pnpm`](#pnpm)
+
+### `package.json`
+
+`package.json` is a configuration [file](./file-system.md#file) in a [`Node.js`](#what-is-nodejs) project that declares the project's [dependencies](./package-manager.md#dependency), scripts, and metadata.
+
+[`pnpm`](#pnpm) reads it to know which packages to install and which commands to run.
+
+### `node_modules`
+
+`node_modules` stores all [`Node.js`](#nodejs) modules installed using [`pnpm`](#pnpm) or another package manager for `Node.js`.
+
+This [directory](./file-system.md#directory) is [`.gitignore`](./git.md#gitignore)-d.
 
 ## `npm`
 
 `npm` is the default package manager for [`Node.js`](#what-is-nodejs).
-It installs and manages project dependencies declared in [`package.json`](#packagejson).
 
 It is installed automatically when you install [`Node.js`](#install-nodejs).
 
@@ -143,65 +179,111 @@ Docs:
 
 - [`npm` documentation](https://docs.npmjs.com/)
 
-### `package.json`
+## `pnpm`
 
-`package.json` is a configuration [file](./file-system.md#file) in a [`Node.js`](#what-is-nodejs) project that declares the project's [dependencies](./package-manager.md#dependency), scripts, and metadata.
+`pnpm` is a fast, disk-efficient package manager for [`Node.js`](#what-is-nodejs).
+It installs and manages project dependencies declared in [`package.json`](#packagejson).
 
-[`npm`](#npm) reads it to know which packages to install and which commands to run.
+Docs:
 
-### `node_modules`
+- [`pnpm` documentation](https://pnpm.io/)
 
-`node_modules` stores all [`Node.js`](#nodejs) modules installed using [`npm`](#npm) or another package manager for `Node.js`.
+### Install `pnpm`
 
-This [directory](./file-system.md#directory) is [`.gitignore`](./git.md#gitignore)-d.
+- Method 1: [Install `pnpm` via the official installer script](#install-pnpm-via-the-official-installer-script)
+- Method 2: [Install `pnpm` via `Nix`](#install-pnpm-via-nix)
 
-## Common `npm` commands
+#### Install `pnpm` via the official installer script
 
-- [`npm install`](#npm-install)
+```terminal
+curl -fsSL https://get.pnpm.io/install.sh | sh -
+```
 
-### `npm install`
+#### Install `pnpm` via `Nix`
+
+1. [Install `Nix`](./nix.md#install-nix) if it's not yet installed.
+
+2. To install [`pnpm`](#pnpm) from [`nixpkgs`](./nix.md#nixpkgs),
+
+   [run in the `VS Code Terminal`](./vs-code.md#run-a-command-in-the-vs-code-terminal):
+
+   ```terminal
+   nix profile add nixpkgs#pnpm
+   ```
+
+3. To set up `pnpm`,
+
+   [run in the `VS Code Terminal`](./vs-code.md#run-a-command-in-the-vs-code-terminal):
+
+   ```terminal
+   pnpm setup
+   ```
+
+4. To update the current shell environment with `pnpm` variables set in the [shell profile](./shell.md#shell-profile),
+
+   [run in the `VS Code Terminal`](./vs-code.md#run-a-command-in-the-vs-code-terminal):
+
+   ```terminal
+   source ~/.bashrc
+   ```
+
+   Alternatively, [open a new `VS Code Terminal`](./vs-code.md#open-a-new-vs-code-terminal).
+   The new terminal will use the new shell profile.
+
+5. To check that [`pnpm`](#pnpm) is available,
+
+   [run in the `VS Code Terminal`](./vs-code.md#run-a-command-in-the-vs-code-terminal):
+
+   ```terminal
+   pnpm --version
+   ```
+
+   The output should be similar to this:
+
+   ```terminal
+   10.28.0
+   ```
+
+### Common `pnpm` commands
+
+- [`pnpm install`](#pnpm-install)
+
+#### `pnpm install`
 
 This command [installs packages in the specified directory](#install-nodejs-dependencies-in-the-directory).
 
 Executes postinstall hooks.
 
-## Common `npm` actions
+### Common `pnpm` actions
 
 - [Install `Node.js` dependencies in the directory](#install-nodejs-dependencies-in-the-directory)
 
-### Install `Node.js` dependencies in the directory
+#### Install `Node.js` dependencies in the directory
 
 > [!NOTE]
-> See [`npm install`](#npm-install), [`package.json`](#packagejson), [directory](./file-system.md#directory).
+> See [`pnpm install`](#pnpm-install), [`package.json`](#packagejson), [directory](./file-system.md#directory).
 
 1. [Open in `VS Code` the project directory](./vs-code.md#open-the-directory).
 
-2. If the `package.json` is in the [root directory of the repository](./git.md#root-directory-of-the-repository),
+2. Navigate to the directory that contains `package.json`,
 
    [run in the `VS Code Terminal`](./vs-code.md#run-a-command-in-the-vs-code-terminal):
 
    ```terminal
-   npm install
+   cd frontend
    ```
 
-3. If the `package.json` is in a [subdirectory](./file-system.md#subdirectory) of the root directory of the repository,
+3. [Run in the `VS Code Terminal`](./vs-code.md#run-a-command-in-the-vs-code-terminal):
 
-   run in the `VS Code Terminal`:
-
-   ```
-   npm install --prefix <frontend-dir>
-   ```
-
-   Example:
-
-   ```
-   npm install --prefix frontend
+   ```terminal
+   pnpm install
    ```
 
 4. Verify that the output is similar to this:
 
    ```terminal
-   added 143 packages, and audited 144 packages in 3s
+   Packages: +184
+   Done in 4.6s using pnpm v10.28.0
    ```
 
 5. [Open the `VS Code Explorer`](./vs-code.md#vs-code-explorer).

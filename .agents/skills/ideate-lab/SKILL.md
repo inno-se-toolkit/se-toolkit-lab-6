@@ -29,7 +29,7 @@ Ideate a new lab for a given topic and write the plan to `instructors/lab-plan.m
 
 ## Rules
 
-Follow all conventions in [`contributing/conventions/writing/lab-plan.md`](../../../contributing/conventions/writing/lab-plan.md). Verify the [Checklist](../../../contributing/conventions/writing/lab-plan.md#10-checklist) before finishing.
+Follow all conventions in [`contributing/conventions/writing/lab-plan.md`](../../../contributing/conventions/writing/lab-plan.md). Verify the [Checklist](../../../contributing/conventions/writing/lab-plan.md#11-checklist) before finishing.
 
 ## Output
 

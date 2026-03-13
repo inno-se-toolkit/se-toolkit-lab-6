@@ -20,6 +20,7 @@
 - [Chat with `Qwen Code`](#chat-with-qwen-code)
   - [Refer to a file](#refer-to-a-file)
   - [Use a skill](#use-a-skill)
+- [Lab instructions for `Qwen Code`](#lab-instructions-for-qwen-code)
 
 ## What is `Qwen Code`
 
@@ -126,31 +127,9 @@ The file must be non-empty.
 
 1. [Connect to the VM](./ssh.md#connect-to-the-vm).
 
-2. To install [`pnpm`](./nodejs.md#pnpm),
+2. [Install `pnpm`](./nodejs.md#install-pnpm).
 
-   [run in the `VS Code Terminal`](./vs-code.md#run-a-command-in-the-vs-code-terminal):
-
-   ```terminal
-   nix profile add nixpkgs#pnpm
-   ```
-
-3. To set up `pnpm`,
-
-   [run in the `VS Code Terminal`](./vs-code.md#run-a-command-in-the-vs-code-terminal):
-
-   ```terminal
-   pnpm setup
-   ```
-
-4. To update the current shell environment with `pnpm` variables set in the [shell profile](./shell.md#profile),
-
-   [run in the `VS Code Terminal`](./vs-code.md#run-a-command-in-the-vs-code-terminal):
-
-   ```terminal
-   source ~/.bashrc
-   ```
-
-5. To install [`Qwen Code`](#what-is-qwen-code),
+3. To install [`Qwen Code`](#what-is-qwen-code),
 
    [run in the `VS Code Terminal`](./vs-code.md#run-a-command-in-the-vs-code-terminal):
 
@@ -158,23 +137,24 @@ The file must be non-empty.
    pnpm add -g @qwen-code/qwen-code
    ```
 
-6. [Open a chat with `Qwen Code` using the CLI](#open-a-chat-with-qwen-code-using-the-cli).
+4. [Open a chat with `Qwen Code` using the CLI](#open-a-chat-with-qwen-code-using-the-cli).
 
-7. Write `/auth` in the chat to [authenticate via Qwen OAuth](https://github.com/QwenLM/qwen-code?tab=readme-ov-file#authentication).
+5. Write `/auth` in the chat to [authenticate via Qwen OAuth](https://github.com/QwenLM/qwen-code?tab=readme-ov-file#authentication).
 
-8. Open the link in a browser to complete the authentication procedure.
+6. Open the link in a browser to complete the authentication procedure.
 
 ### Set up the `Qwen Code` API (remote machine)
 
-> [`qwen-code-oai-proxy`](https://github.com/aptdnfapt/qwen-code-oai-proxy) exposes [`Qwen Code`](#what-is-qwen-code) through an [OpenAI-compatible API](./llm.md#openai-compatible-api) so that other tools can use it as an [LLM](./llm.md#what-is-an-llm).
+> [`qwen-code-oai-proxy`](https://github.com/inno-se-toolkit/qwen-code-oai-proxy) exposes [`Qwen Code`](#what-is-qwen-code) through an [OpenAI-compatible API](./llm.md#openai-compatible-api) so that other tools can use it as an [LLM](./llm.md#what-is-an-llm).
 
 1. [Set up the `Qwen Code` CLI (remote machine)](#set-up-the-qwen-code-cli-remote-machine).
 
    Keep working in the opened `VS Code Terminal`.
    You complete the following steps on your VM.
 
-2. To [clone the repo using the `VS Code Terminal`](./git-vscode.md#clone-the-repo-using-the-vs-code-terminal):
-   <https://github.com/inno-se-toolkit/qwen-code-oai-proxy>
+2. To [clone using the `VS Code Terminal` the repo](./git-vscode.md#clone-the-repo-using-the-vs-code-terminal)
+
+   <https://github.com/inno-se-toolkit/qwen-code-oai-proxy>,
 
    [run in the `VS Code Terminal`](./vs-code.md#run-a-command-in-the-vs-code-terminal):
 
@@ -353,10 +333,6 @@ Method 2:
 4. Click `Auto` (`Pick Model`).
 5. Click `Qwen 3 Coder Plus`.
 
-## Lab instructions for `Qwen Code`
-
-`Qwen Code` automatically reads `AGENTS.md` in the project root. This file contains instructions that guide the agent to help you learn — not just generate code. The agent will ask you questions, help you plan, and encourage you to write code yourself.
-
 ## Chat with `Qwen Code`
 
 Actions:
@@ -383,11 +359,6 @@ Example: `@main.py`.
    See [Refer to a file](#refer-to-a-file).
 5. Press `Enter`.
 
-<!-- TODO qwen on VM -->
-<!-- 
+## Lab instructions for `Qwen Code`
 
-#### Install nodejs on the VM
-
-- scp ~/.qwen/oauth_creds.json se-toolkit-vm:~/.qwen/oauth_creds.json
-- nix profile add nixpkgs#nodejs_25
- -->
+[`Qwen Code`](#what-is-qwen-code) automatically reads [`AGENTS.md`](../AGENTS.md) in the project root. This file contains instructions that guide the agent to help you learn — not just generate code. The agent will ask you questions, help you plan, and encourage you to write code yourself.

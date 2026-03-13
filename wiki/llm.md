@@ -5,9 +5,13 @@
 - [What is an LLM](#what-is-an-llm)
 - [Model](#model)
   - [Choose a model](#choose-a-model)
-  - [Free models](#free-models)
+  - [Local inference](#local-inference)
+- [LLM provider](#llm-provider)
+  - [`OpenRouter`](#openrouter)
+- [Free models](#free-models)
 - [LLM provider API](#llm-provider-api)
-- [Request to LLM provider API](#request-to-llm-provider-api)
+  - [`OpenAI`-compatible API](#openai-compatible-api)
+  - [Request to LLM provider API](#request-to-llm-provider-api)
 - [Token](#token)
 - [Context](#context)
   - [Context window](#context-window)
@@ -35,19 +39,70 @@ Different models vary in capability, speed, and cost. [Coding agents](./coding-a
 
 Choose a model for the task at hand.
 
-<!-- TODO tips -->
+### Local inference
 
-### Free models
+Docs:
 
-[`OpenRouter`](https://openrouter.ai/) provides [free models](https://openrouter.ai/collections/free-models).
+- [What Can I Run?](https://apxml.com/models)
+
+## LLM provider
+
+### `OpenRouter`
+
+## Free models
+
+- [`OpenRouter`](https://openrouter.ai/) provides [free models](https://openrouter.ai/collections/free-models).
 
 ## LLM provider API
 
-<!-- TODO -->
+An LLM provider API is an [HTTP API](./web-api.md#http-api) exposed by an LLM provider (e.g., `OpenAI`, `Anthropic`, [`OpenRouter`](#openrouter)) that allows applications and tools to send requests to their [LLMs](#what-is-an-llm) programmatically.
 
-## Request to LLM provider API
+[Coding agents](./coding-agents.md#what-is-a-coding-agent) use an LLM provider API to send [prompts](#prompt) and receive generated responses, authenticating each [request](#request-to-llm-provider-api) with an API key.
 
-<!-- TODO -->
+<!-- TODO links - authentication, api key, responses -->
+
+Docs:
+
+- [OpenAI API reference](https://developers.openai.com/api/reference/overview)
+- [OpenRouter API reference](https://openrouter.ai/docs/api-reference/overview)
+
+### `OpenAI`-compatible API
+
+An `OpenAI`-compatible API follows the same request and response format as the `OpenAI` API, allowing the same client code to work with different [LLM providers](#llm-provider-api) by changing only the base URL and API key.
+
+Most [coding agents](./coding-agents.md#what-is-a-coding-agent) support `OpenAI`-compatible APIs, which lets you point them at providers like [`OpenRouter`](#openrouter) instead of `OpenAI` directly.
+
+Docs:
+
+- [OpenRouter: OpenAI compatibility](https://openrouter.ai/docs/community/frameworks)
+
+### Request to LLM provider API
+
+A request to an LLM provider API is an [`HTTP` POST request](./http.md#http-request) that includes the [model](#model) name and a list of messages, each with a role and text content.
+
+The three message roles are:
+
+- `system` — instructions that set the behavior of the LLM (e.g., "You are a helpful assistant.").
+- `user` — the input from the user.
+- `assistant` — a previous response from the LLM, included to provide conversation history.
+
+The request is authenticated using an API key in the [`Authorization` header](./http-auth.md#http-authentication).
+
+Example request body:
+
+```json
+{
+  "model": "gpt-4o-mini",
+  "messages": [
+    { "role": "system", "content": "You are a helpful assistant." },
+    { "role": "user", "content": "What is an LLM?" }
+  ]
+}
+```
+
+Docs:
+
+- [OpenAI: Chat completions](https://platform.openai.com/docs/guides/chat-completions)
 
 ## Token
 

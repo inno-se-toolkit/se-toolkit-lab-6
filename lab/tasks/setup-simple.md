@@ -2,6 +2,11 @@
 
 - [1. Required steps](#1-required-steps)
   - [1.1. Set up your fork](#11-set-up-your-fork)
+    - [1.1.1. Fork the course instructors' repo](#111-fork-the-course-instructors-repo)
+    - [1.1.2. Go to your fork](#112-go-to-your-fork)
+    - [1.1.3. Enable issues](#113-enable-issues)
+    - [1.1.4. Add a classmate as a collaborator](#114-add-a-classmate-as-a-collaborator)
+    - [1.1.5. Protect your `main` branch](#115-protect-your-main-branch)
   - [1.2. Clone your fork and set up the environment](#12-clone-your-fork-and-set-up-the-environment)
   - [1.3. Start the services locally](#13-start-the-services-locally)
   - [1.4. Populate the database](#14-populate-the-database)
@@ -182,7 +187,8 @@ The database starts empty. You need to run the ETL pipeline to populate it with 
 
 > [!IMPORTANT]
 > If the dashboard shows no data or errors, make sure:
-> - The ETL sync completed successfully (step 1.4)
+>
+> - The ETL sync completed successfully (step 1.5)
 > - You entered the correct API key in the frontend
 > - Try selecting a different lab in the dropdown (e.g., `lab-04`)
 
