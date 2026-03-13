@@ -51,25 +51,33 @@ def main():
     msgs = [{"role": "system", "content": "You are a System Agent. ALWAYS use tools to find info. DO NOT guess. To answer, you MUST return ONLY a JSON object with 'answer' and 'source' (e.g. 'wiki/git.md#anchor'). No other text."}, {"role": "user", "content": q}]
     hist = []
     for _ in range(15):
-        resp = cl.chat.completions.create(model=m, messages=msgs, tools=tools)
-        msg = resp.choices[0].message
-        if not msg.tool_calls:
-            content = msg.content or ""
-            start = content.find('{')
-            end = content.rfind('}')
-            if start != -1 and end != -1:
-                try:
-                    data = json.loads(content[start:end+1])
-                    print(json.dumps({"answer": data.get("answer"), "source": data.get("source", "unknown"), "tool_calls": hist}))
-                    return
-                except: pass
-            print(json.dumps({"answer": content, "source": "unknown", "tool_calls": hist}))
+        try:
+            resp = cl.chat.completions.create(model=m, messages=msgs, tools=tools)
+            msg = resp.choices[0].message
+            if not msg.tool_calls:
+                content = msg.content or ""
+                start = content.find('{')
+                end = content.rfind('}')
+                if start != -1 and end != -1:
+                    try:
+                        data = json.loads(content[start:end+1])
+                        print(json.dumps({"answer": data.get("answer"), "source": data.get("source", "unknown"), "tool_calls": hist}))
+                        return
+                    except: pass
+                print(json.dumps({"answer": content, "source": "unknown", "tool_calls": hist}))
+                return
+            msgs.append(msg)
+            for tc in msg.tool_calls:
+                fn = tc.function.name
+                try: args = json.loads(tc.function.arguments)
+                except: args = {"path": "unknown"} # Fallback for malformed args
+                res = list_files(args.get("path", ".")) if fn=="list_files" else \
+                      read_file(args.get("path", "")) if fn=="read_file" else \
+                      query_api(args.get("method", "GET"), args.get("path", ""), args.get("body")) if fn=="query_api" else "Error"
+                hist.append({"tool": fn, "args": args, "result": str(res)})
+                msgs.append({"tool_call_id": tc.id, "role": "tool", "name": fn, "content": str(res)})
+        except Exception as e:
+            print(json.dumps({"answer": f"Error: {e}", "tool_calls": hist}))
             return
-        msgs.append(msg)
-        for tc in msg.tool_calls:
-            f, a = tc.function.name, json.loads(tc.function.arguments)
-            r = list_files(a["path"]) if f=="list_files" else read_file(a["path"]) if f=="read_file" else query_api(a["method"], a["path"], a.get("body"))
-            hist.append({"tool": f, "args": a, "result": str(r)})
-            msgs.append({"tool_call_id": tc.id, "role": "tool", "name": f, "content": str(r)})
 
 if __name__ == "__main__": main()
