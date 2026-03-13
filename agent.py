@@ -142,9 +142,10 @@ def main():
             "role": "system", 
             "content": (
                 "You are a System Agent. Your goal is to answer questions about the project using documentation, source code, and the live API. "
-                "1. For documentation or code questions, use `list_files` and `read_file`. "
-                "2. For data-dependent or live system questions, use `query_api`. "
-                "3. For bug diagnosis, query the API, read the error message, and then inspect the relevant source code files. "
+                "1. For documentation, search in the 'wiki/' directory. "
+                "2. For source code, search in the 'backend/' directory (e.g., 'backend/app/main.py'). "
+                "3. For data-dependent or live system questions, use `query_api`. "
+                "4. For bug diagnosis, query the API, read the error message, and then inspect the relevant source code files. "
                 "Always provide a concise answer. If you used a file from the wiki, you MUST cite your source as 'wiki/filename.md#section-anchor'. "
                 "CRITICAL: YOUR FINAL RESPONSE MUST BE ONLY A JSON OBJECT. NO MARKDOWN, NO EXPLANATIONS. "
                 "Format: {\"answer\": \"your concise answer here\", \"source\": \"wiki/filename.md#section-anchor\"}"
