@@ -21,7 +21,7 @@ def read_file(path):
         if not os.path.isfile(p): return f"Error: {path} not found"
         with open(p, 'r', encoding='utf-8') as f:
             c = f.read()
-            return (c[:10000] + "\n[Truncated]") if len(c) > 10000 else c
+            return (c[:15000] + "\n[Truncated]") if len(c) > 15000 else c
     except Exception as e: return str(e)
 
 def query_api(method, path, body=None):
@@ -48,7 +48,7 @@ def main():
     cl = OpenAI(api_key=os.getenv("LLM_API_KEY"), base_url=os.getenv("LLM_API_BASE"))
     m = os.getenv("LLM_MODEL", "qwen3-coder-plus")
     q = sys.argv[1] if len(sys.argv) > 1 else "Hi"
-    msgs = [{"role": "system", "content": "You are a System Agent. ALWAYS use tools to find info. DO NOT guess. To answer, you MUST return ONLY a JSON object with 'answer' and 'source' (e.g. 'wiki/git.md#anchor' or 'backend/app/main.py'). No other text. For directories, try 'backend/app' if needed."}, {"role": "user", "content": q}]
+    msgs = [{"role": "system", "content": "You are a System Agent. ALWAYS use tools to find info. DO NOT guess. To answer, you MUST return ONLY a JSON object with 'answer' and 'source' (e.g. 'wiki/git.md#anchor'). No other text."}, {"role": "user", "content": q}]
     hist = []
     for _ in range(15):
         resp = cl.chat.completions.create(model=m, messages=msgs, tools=tools)
