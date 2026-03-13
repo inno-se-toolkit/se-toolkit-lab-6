@@ -157,6 +157,8 @@ def main():
     
     for _ in range(10):
         try:
+            # For the first call, we can suggest tools, but for subsequent calls,
+            # we want the LLM to either use a tool or provide the FINAL answer in JSON.
             response = client.chat.completions.create(
                 model=model,
                 messages=messages,
@@ -169,17 +171,21 @@ def main():
             
             if not tool_calls:
                 content = response_message.content or ""
+                # Attempt to parse the content as JSON
                 try:
-                    json_str = content.strip()
-                    if json_str.startswith("```json"):
-                        json_str = json_str[len("```json"):].strip()
-                    if json_str.endswith("```"):
-                        json_str = json_str[:-3].strip()
+                    # Robust parsing: find the first '{' and last '}'
+                    start_idx = content.find('{')
+                    end_idx = content.rfind('}')
+                    if start_idx != -1 and end_idx != -1:
+                        json_str = content[start_idx:end_idx+1]
+                        final_data = json.loads(json_str)
+                    else:
+                        raise ValueError("No JSON found")
                     
-                    final_data = json.loads(json_str)
                     answer = final_data.get("answer", content)
                     source = final_data.get("source")
                 except:
+                    # Fallback: create JSON if LLM failed to do so
                     answer = content
                     source = None
                 
