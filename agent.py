@@ -55,19 +55,17 @@ def main():
             resp = cl.chat.completions.create(model=m, messages=msgs, tools=tools)
             msg = resp.choices[0].message
             if not msg.tool_calls:
-                content = msg.content or ""
-                start = content.find('{')
-                end = content.rfind('}')
-                if start != -1 and end != -1:
+                txt = msg.content or ""
+                s, e = txt.find('{'), txt.rfind('}')
+                if s != -1 and e != -1:
                     try:
-                        data = json.loads(content[start:end+1])
-                        ans = data.get("answer", content)
-                        src = data.get("source", "unknown")
+                        d = json.loads(txt[s:e+1])
+                        ans, src = d.get("answer", txt), d.get("source", "unknown")
                         if isinstance(ans, list): ans = ", ".join(map(str, ans))
-                        print(json.dumps({"answer": str(ans), "source": str(src), "tool_calls": history}))
+                        print(json.dumps({"answer": str(ans), "source": str(src), "tool_calls": hist}))
                         return
                     except: pass
-                print(json.dumps({"answer": content, "source": "unknown", "tool_calls": history}))
+                print(json.dumps({"answer": txt, "source": "unknown", "tool_calls": hist}))
                 return
             msgs.append(msg)
             for tc in msg.tool_calls:
@@ -78,8 +76,7 @@ def main():
                       read_file(args.get("path", "")) if fn=="read_file" else \
                       query_api(args.get("method", "GET"), args.get("path", ""), args.get("body")) if fn=="query_api" else "Error"
                 hist.append({"tool": fn, "args": args, "result": str(res)})
-                messages_to_add = {"tool_call_id": tc.id, "role": "tool", "name": fn, "content": str(res)}
-                msgs.append(messages_to_add)
+                msgs.append({"tool_call_id": tc.id, "role": "tool", "name": fn, "content": str(res)})
         except Exception as e:
             print(json.dumps({"answer": f"Error: {e}", "tool_calls": hist}))
             return
