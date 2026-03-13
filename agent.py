@@ -48,11 +48,13 @@ def main():
     cl = OpenAI(api_key=os.getenv("LLM_API_KEY"), base_url=os.getenv("LLM_API_BASE"))
     m = os.getenv("LLM_MODEL", "qwen3-coder-plus")
     q = sys.argv[1] if len(sys.argv) > 1 else "Hi"
-    msgs = [{"role": "system", "content": "You are a System Agent. ALWAYS use tools. Documentation is in wiki/, source code in backend/app/. Routers are in backend/app/routers/. Answer MUST be JSON: {\"answer\": \"string\", \"source\": \"wiki/file.md#anchor\"}."}, {"role": "user", "content": q}]
+    msgs = [{"role": "system", "content": "You are a System Agent. ALWAYS use tools first. To answer, MUST return ONLY a JSON: {\"answer\": \"string\", \"source\": \"wiki/file.md#anchor\"}. No other text."}, {"role": "user", "content": q}]
     hist = []
-    for _ in range(15):
+    for i in range(15):
         try:
-            resp = cl.chat.completions.create(model=m, messages=msgs, tools=tools)
+            # Force tool usage if no tools used yet
+            tc_choice = "required" if i == 0 else "auto"
+            resp = cl.chat.completions.create(model=m, messages=msgs, tools=tools, tool_choice=tc_choice)
             msg = resp.choices[0].message
             if not msg.tool_calls:
                 txt = msg.content or ""
@@ -60,11 +62,10 @@ def main():
                 if s != -1 and e != -1:
                     try:
                         d = json.loads(txt[s:e+1])
-                        ans, src = d.get("answer", txt), d.get("source", "unknown")
-                        print(json.dumps({"answer": str(ans), "source": str(src), "tool_calls": hist}))
+                        print(json.dumps({"answer": str(d.get("answer", txt)), "source": str(d.get("source", "unknown")), "tool_calls": hist}))
                         return
                     except: pass
-                print(json.dumps({"answer": txt, "source": "unknown", "tool_calls": hist}))
+                print(json.dumps({"answer": str(txt), "source": "unknown", "tool_calls": hist}))
                 return
             msgs.append(msg)
             for tc in msg.tool_calls:
