@@ -103,8 +103,8 @@ reportAssignmentType = "none"
 reportIncompatibleVariableOverride = "none"
 
 [tool.pytest.ini_options]
-testpaths = ["backend/tests"]
-pythonpath = ["backend"]
+testpaths = ["backend/tests", "tests"]
+pythonpath = ["backend", "."]
 asyncio_mode = "auto"
 
 [tool.ty.src]
