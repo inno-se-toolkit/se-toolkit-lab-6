@@ -146,7 +146,8 @@ def main():
                 "- For data-dependent or live system questions, use `query_api`. "
                 "- For bug diagnosis, query the API, read the error message, and then inspect the relevant source code files. "
                 "Always provide a concise answer. If you used a file from the wiki, cite your source as 'wiki/filename.md#section-anchor'. "
-                "Your final response must be a JSON object with 'answer' and 'source' (optional) fields."
+                "CRITICAL: Your final response MUST be a valid JSON object with 'answer' and 'source' (optional) fields. "
+                "Do not include any text outside the JSON object."
             )
         },
         {"role": "user", "content": question}
