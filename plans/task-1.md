@@ -36,3 +36,4 @@ The agent will:
 - Missing API key → exit with error message to stderr
 - API timeout/error → exit with error message to stderr
 - Invalid input → exit with error message to stderr
+- If there will be any others error, please try to solve it by yourself, or inform me
