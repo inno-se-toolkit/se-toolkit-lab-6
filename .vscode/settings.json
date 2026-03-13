@@ -38,5 +38,6 @@
   // Necessary for now.
   // See note here:
   // https://marketplace.visualstudio.com/items?itemName=ms-python.vscode-python-envs
-  "python.useEnvironmentsExtension": true
+  "python.useEnvironmentsExtension": true,
+  "python-envs.defaultEnvManager": "ms-python.python:system"
 }
