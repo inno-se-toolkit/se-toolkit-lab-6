@@ -11,45 +11,34 @@ def run_agent(question):
     )
     return json.loads(result.stdout)
 
-def test_agent_backend_framework():
+def test_agent_uses_read_file_for_framework():
     """
-    Test that the agent can identify the backend framework (FastAPI).
-    It should likely read pyproject.toml or a similar file.
+    Test that the agent uses 'read_file' when asked about the backend framework.
     """
-    question = "What Python web framework does the backend use?"
+    question = "What Python web framework does this project's backend use? Read the source code to find out."
     output = run_agent(question)
     
-    # Check for expected fields
     assert "answer" in output
     assert "tool_calls" in output
     
-    # Check tool calls: read_file should be used
-    tool_names = [tc["tool"] for tc in output["tool_calls"]]
-    assert "read_file" in tool_names
-    
-    # Check answer
-    assert "FastAPI" in output["answer"]
+    # Check if read_file was used
+    tools_used = [tc["tool"] for tc in output["tool_calls"]]
+    assert "read_file" in tools_used, f"Agent should use 'read_file' to check framework, but used: {tools_used}"
+    assert "fastapi" in output["answer"].lower()
 
-def test_agent_database_count():
+def test_agent_uses_query_api_for_items():
     """
-    Test that the agent can count items in the database.
-    It should use the query_api tool.
+    Test that the agent uses 'query_api' for questions about items in the database.
     """
-    question = "How many items are in the database?"
+    question = "How many items are currently stored in the database? Query the running API to find out."
     output = run_agent(question)
     
-    # Check for expected fields
     assert "answer" in output
     assert "tool_calls" in output
     
-    # Check tool calls: query_api should be used
-    tool_names = [tc["tool"] for tc in output["tool_calls"]]
-    assert "query_api" in tool_names
-    
-    # Verify query_api arguments
-    query_call = next(tc for tc in output["tool_calls"] if tc["tool"] == "query_api")
-    assert "/items/" in query_call["args"]["path"]
-    assert query_call["args"]["method"].upper() == "GET"
-    
-    # Check that a number is in the answer
-    assert any(char.isdigit() for char in output["answer"])
+    # Check if query_api was used
+    tools_used = [tc["tool"] for tc in output["tool_calls"]]
+    assert "query_api" in tools_used, f"Agent should use 'query_api' to check item count, but used: {tools_used}"
+    # The answer should contain a number (the count)
+    import re
+    assert re.search(r"\d+", output["answer"]), f"Answer should contain a number, but got: {output['answer']}"

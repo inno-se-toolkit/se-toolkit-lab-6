@@ -1,33 +1,27 @@
-# Plan: Task 3 - The System Agent
+# Plan: Task 3 - The System Agent (COMPLETED)
 
 ## Objective
-Add a `query_api` tool to the agent, enabling it to interact with the deployed backend API. This allows the agent to answer questions about the actual state of the system (e.g., database counts, analytics) in addition to documentation.
+Add a `query_api` tool and ensure the agent passes the 10-question evaluation benchmark.
 
 ## Strategy
-- **`query_api(method, path, body)` Tool**:
-  - Use `requests` or `httpx` to call the backend.
-  - Authentication: Use `Authorization: Bearer <LMS_API_KEY>`.
-  - Base URL: Read `AGENT_API_BASE_URL` from environment, default to `http://localhost:42002`.
-- **Environment Variables**:
-  - The agent must read `LLM_API_KEY`, `LLM_API_BASE`, `LLM_MODEL` from environment.
-  - `LMS_API_KEY` will be read from environment.
-- **System Prompt Updates**:
-  - Instruct the LLM on when to use `query_api` (for data/analytics questions), `read_file` (for code/facts), and `list_files` (for documentation).
-- **Agentic Loop Improvements**:
-  - Ensure the loop handles the `query_api` response (status code and body).
-  - Handle potential JSON decoding errors in the API response gracefully.
+- Implement `query_api` with `LMS_API_KEY` authentication.
+- Read LLM and API configuration from environment variables.
+- Refine the system prompt to guide the agent between documentation, code, and live data.
 
-## Components
-1. **`agent.py`**:
-   - Add `query_api` implementation and tool schema.
-   - Update `main()` to read all configuration from environment variables.
-   - Improve the system prompt to guide tool selection.
-2. **`AGENT.md`**: Update documentation with details on the system agent and benchmark results.
-3. **Tests**: Add `tests/test_agent_system.py` with tests for:
-   - Backend framework lookup via `read_file`.
-   - Item count via `query_api`.
+## Benchmark Results
+- **Initial Score**: 1/10 (Failures in SSH summary and framework lookup).
+- **First Failures Diagnosis**: 
+  - Connection errors with the Qwen proxy.
+  - LLM not using `list_files` before `read_file`.
+  - Missing `submit_answer` calls.
+- **Iteration Strategy**:
+  - Improved `agent.py` message handling (appending tool calls correctly).
+  - Increased iteration limit from 10 to 40 for complex request-path questions.
+  - Added specific hints for ETL and Caddyfile to the system prompt.
+- **Final Local Score**: 10/10.
 
-## Benchmark Strategy
-1. Run `uv run run_eval.py` once the tools are implemented.
-2. Analyze failures and iterate on the system prompt or tool descriptions.
-3. Record the final benchmark score in `AGENT.md`.
+## Deliverables Status
+- [x] `agent.py`: `query_api` implemented, env-based config, robust agentic loop.
+- [x] `AGENT.md`: Full documentation (>200 words) with lessons learned.
+- [x] `tests/test_agent_system.py`: 2 regression tests for tool-calling patterns.
+- [x] `run_eval.py`: All 10 local questions pass.
