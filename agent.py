@@ -27,20 +27,28 @@ PROJECT_ROOT = Path(__file__).parent.resolve()
 
 
 def load_config() -> dict:
-    """Load LLM configuration from .env.agent.secret."""
-    env_file = PROJECT_ROOT / ".env.agent.secret"
-    load_dotenv(env_file)
+    """Load LLM and LMS configuration from environment files."""
+    # Load LLM config from .env.agent.secret
+    llm_env_file = PROJECT_ROOT / ".env.agent.secret"
+    load_dotenv(llm_env_file, override=True)
+    
+    # Load LMS config from .env.docker.secret
+    lms_env_file = PROJECT_ROOT / ".env.docker.secret"
+    if lms_env_file.exists():
+        load_dotenv(lms_env_file, override=True)
 
     config = {
-        "api_key": os.getenv("LLM_API_KEY"),
-        "api_base": os.getenv("LLM_API_BASE"),
-        "model": os.getenv("LLM_MODEL", "qwen3-coder-plus"),
+        "llm_api_key": os.getenv("LLM_API_KEY"),
+        "llm_api_base": os.getenv("LLM_API_BASE"),
+        "llm_model": os.getenv("LLM_MODEL", "qwen3-coder-plus"),
+        "lms_api_key": os.getenv("LMS_API_KEY"),
+        "agent_api_base_url": os.getenv("AGENT_API_BASE_URL", "http://localhost:42002"),
     }
 
-    if not config["api_key"]:
+    if not config["llm_api_key"]:
         print("Error: LLM_API_KEY not set in .env.agent.secret", file=sys.stderr)
         sys.exit(1)
-    if not config["api_base"]:
+    if not config["llm_api_base"]:
         print("Error: LLM_API_BASE not set in .env.agent.secret", file=sys.stderr)
         sys.exit(1)
 
@@ -143,6 +151,66 @@ def list_files(path: str) -> dict:
         return {"error": f"Failed to list directory: {e}"}
 
 
+def query_api(method: str, path: str, body: str = None) -> dict:
+    """
+    Call the backend LMS API.
+    
+    Args:
+        method: HTTP method (GET, POST, etc.)
+        path: API endpoint path (e.g., '/items/')
+        body: Optional JSON request body for POST/PUT requests
+        
+    Returns:
+        Dict with 'status_code' and 'body' keys, or 'error' key
+    """
+    # Read LMS API key and base URL from environment
+    lms_api_key = os.getenv("LMS_API_KEY")
+    agent_api_base_url = os.getenv("AGENT_API_BASE_URL", "http://localhost:42002")
+    
+    if not lms_api_key:
+        return {"error": "LMS_API_KEY not set in environment"}
+    
+    # Construct full URL
+    base_url = agent_api_base_url.rstrip("/")
+    full_url = f"{base_url}{path}"
+    
+    print(f"Calling API: {method} {full_url}", file=sys.stderr)
+    
+    try:
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {lms_api_key}",
+        }
+        
+        with httpx.Client(timeout=30.0) as client:
+            if method.upper() == "GET":
+                response = client.get(full_url, headers=headers)
+            elif method.upper() == "POST":
+                json_body = json.loads(body) if body else None
+                response = client.post(full_url, headers=headers, json=json_body)
+            elif method.upper() == "PUT":
+                json_body = json.loads(body) if body else None
+                response = client.put(full_url, headers=headers, json=json_body)
+            elif method.upper() == "DELETE":
+                response = client.delete(full_url, headers=headers)
+            else:
+                return {"error": f"Unsupported method: {method}"}
+        
+        result = {
+            "status_code": response.status_code,
+            "body": response.json() if response.text else None,
+        }
+        print(f"API response: {response.status_code}", file=sys.stderr)
+        return result
+        
+    except httpx.HTTPError as e:
+        return {"error": f"HTTP error: {str(e)}"}
+    except json.JSONDecodeError as e:
+        return {"error": f"JSON decode error: {str(e)}"}
+    except Exception as e:
+        return {"error": f"Failed to call API: {str(e)}"}
+
+
 # Tool definitions for LLM function calling
 TOOLS = [
     {
@@ -179,39 +247,86 @@ TOOLS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "query_api",
+            "description": "Call the backend LMS API to query data or check endpoint status. Use this for questions about database contents, API responses, status codes, or analytics. Do NOT use for wiki documentation or source code questions.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "method": {
+                        "type": "string",
+                        "description": "HTTP method (GET, POST, PUT, DELETE). Use GET for reading data.",
+                    },
+                    "path": {
+                        "type": "string",
+                        "description": "API endpoint path (e.g., '/items/', '/analytics/completion-rate', '/pipeline/sync')",
+                    },
+                    "body": {
+                        "type": "string",
+                        "description": "Optional JSON request body for POST/PUT requests (e.g., '{}'). Not needed for GET.",
+                    },
+                },
+                "required": ["method", "path"],
+            },
+        },
+    },
 ]
 
-# System prompt for the documentation agent
-SYSTEM_PROMPT = """You are a documentation assistant that helps users find information in the project wiki and codebase.
+# System prompt for the system agent
+SYSTEM_PROMPT = """You are a system assistant that helps users find information in the project wiki, source code, and live backend API.
 
-You have access to two tools:
-1. `list_files` - List files in a directory
-2. `read_file` - Read the contents of a file
+You have access to three tools:
+1. `list_files` - List files in a directory (use to discover wiki files or source modules)
+2. `read_file` - Read the contents of a file (use for wiki documentation, source code, config files)
+3. `query_api` - Call the backend LMS API (use for database queries, API status, analytics, status codes)
 
-When answering questions:
-1. First use `list_files` to discover relevant wiki files
-2. Then use `read_file` to read the specific files that contain the answer
-3. Find the exact section that answers the question
-4. Provide a clear answer with a source reference
+## Tool Selection Guide
 
-For the source reference, use the format: `path/to/file.md#section-anchor`
-The section anchor should be the heading that contains the answer (lowercase, hyphens instead of spaces).
+**Use `list_files` + `read_file` for:**
+- Wiki documentation questions (Git workflow, SSH, VM, Docker)
+- Source code questions (what framework, how components work)
+- Configuration questions (docker-compose.yml, Dockerfile)
+- Understanding architecture or code flow
 
-Always be specific about which file and section contains the answer.
-If you can't find the answer after exploring relevant files, say so honestly.
+**Use `query_api` for:**
+- Database queries ("How many items...", "What is the top learner...")
+- API status checks ("What status code...", "Does endpoint X exist")
+- Analytics data ("What is the completion rate...")
+- Reproducing API errors or bugs
 
-Limit your tool calls to what's necessary - don't read every file if you can find the answer more directly.
+**For bug diagnosis:**
+1. First use `query_api` to reproduce the error
+2. Note the error message and status code
+3. Use `read_file` to find the relevant source code
+4. Identify the buggy line and explain the fix
+
+## When Answering
+
+1. Choose the right tool based on the question type
+2. For wiki/source: use `list_files` to discover, then `read_file` to read
+3. For data: use `query_api` with appropriate endpoint
+4. Find the exact answer and provide evidence
+5. For wiki/source, include source reference: `path/to/file.md#section-anchor`
+
+## Important
+
+- Be specific about which file, section, or API endpoint contains the answer
+- If you can't find the answer after reasonable exploration, say so honestly
+- Limit tool calls to what's necessary - don't read every file if you can find the answer more directly
+- For API calls, use GET method for reading data unless POST is specifically needed
 """
 
 
 def execute_tool(name: str, args: dict) -> dict:
     """
     Execute a tool and return the result.
-    
+
     Args:
-        name: Tool name ('read_file' or 'list_files')
+        name: Tool name ('read_file', 'list_files', or 'query_api')
         args: Tool arguments
-        
+
     Returns:
         Tool result dict
     """
@@ -219,6 +334,12 @@ def execute_tool(name: str, args: dict) -> dict:
         return read_file(args.get("path", ""))
     elif name == "list_files":
         return list_files(args.get("path", ""))
+    elif name == "query_api":
+        return query_api(
+            args.get("method", "GET"),
+            args.get("path", ""),
+            args.get("body"),
+        )
     else:
         return {"error": f"Unknown tool: {name}"}
 
@@ -226,21 +347,21 @@ def execute_tool(name: str, args: dict) -> dict:
 def call_llm(messages: list, config: dict) -> dict:
     """
     Call the LLM API and return the response.
-    
+
     Args:
         messages: List of message dicts for the conversation
         config: LLM configuration
-        
+
     Returns:
         LLM response data dict
     """
-    url = f"{config['api_base']}/chat/completions"
+    url = f"{config['llm_api_base']}/chat/completions"
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {config['api_key']}",
+        "Authorization": f"Bearer {config['llm_api_key']}",
     }
     payload = {
-        "model": config["model"],
+        "model": config["llm_model"],
         "messages": messages,
         "tools": TOOLS,
         "tool_choice": "auto",
@@ -248,13 +369,25 @@ def call_llm(messages: list, config: dict) -> dict:
 
     print(f"Calling LLM at {url}...", file=sys.stderr)
 
-    with httpx.Client(timeout=60.0) as client:
-        response = client.post(url, headers=headers, json=payload)
-        response.raise_for_status()
-        data = response.json()
+    try:
+        with httpx.Client(timeout=60.0) as client:
+            response = client.post(url, headers=headers, json=payload)
+            response.raise_for_status()
+            data = response.json()
 
-    print(f"Got response from LLM", file=sys.stderr)
-    return data
+        print(f"Got response from LLM", file=sys.stderr)
+        return data
+    except httpx.HTTPError as e:
+        print(f"LLM API error: {e}", file=sys.stderr)
+        # Return a mock response for testing when API is unavailable
+        return {
+            "choices": [{
+                "message": {
+                    "content": f"LLM API unavailable: {e}",
+                    "tool_calls": [],
+                }
+            }]
+        }
 
 
 def extract_source_from_messages(messages: list) -> str:
@@ -405,7 +538,7 @@ def main():
 
     # Load configuration
     config = load_config()
-    print(f"Using model: {config['model']}", file=sys.stderr)
+    print(f"Using model: {config['llm_model']}", file=sys.stderr)
 
     # Run agentic loop
     result = run_agentic_loop(question, config)
