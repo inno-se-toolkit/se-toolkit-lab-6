@@ -282,40 +282,83 @@ You have access to three tools:
 2. `read_file` - Read the contents of a file (use for wiki documentation, source code, config files)
 3. `query_api` - Call the backend LMS API (use for database queries, API status, analytics, status codes)
 
-## Tool Selection Guide
+## Tool Selection Guide - BE SPECIFIC
 
-**Use `list_files` + `read_file` for:**
-- Wiki documentation questions (Git workflow, SSH, VM, Docker)
-- Source code questions (what framework, how components work)
-- Configuration questions (docker-compose.yml, Dockerfile)
-- Understanding architecture or code flow
+### Use `list_files` + `read_file` for:
 
-**Use `query_api` for:**
-- Database queries ("How many items...", "What is the top learner...")
-- API status checks ("What status code...", "Does endpoint X exist")
-- Analytics data ("What is the completion rate...")
-- Reproducing API errors or bugs
+**Wiki documentation questions:**
+- "How do you protect a branch?" → list_files("wiki"), find git-related file, read_file
+- "How to clean up Docker?" → list_files("wiki"), find docker-related file, read_file
+- "SSH connection steps?" → list_files("wiki"), find ssh/vm file, read_file
 
-**For bug diagnosis:**
-1. First use `query_api` to reproduce the error
-2. Note the error message and status code
-3. Use `read_file` to find the relevant source code
-4. Identify the buggy line and explain the fix
+**Source code questions:**
+- "What framework does the backend use?" → read_file("backend/app/main.py") - check imports
+- "What technique in Dockerfile?" → read_file("Dockerfile") - look for FROM statements
+- "Error handling in code?" → read_file the specific file mentioned
 
-## When Answering
+**Configuration questions:**
+- "Request lifecycle?" → read_file("docker-compose.yml"), read_file("caddy/Caddyfile"), read_file("Dockerfile"), read_file("backend/app/main.py")
+- "ETL vs API error handling?" → read_file("backend/app/etl.py"), read_file("backend/app/routers/*.py")
 
-1. Choose the right tool based on the question type
-2. For wiki/source: use `list_files` to discover, then `read_file` to read
-3. For data: use `query_api` with appropriate endpoint
-4. Find the exact answer and provide evidence
-5. For wiki/source, include source reference: `path/to/file.md#section-anchor`
+### Use `query_api` for:
 
-## Important
+**Database queries (COUNT, HOW MANY):**
+- "How many items in database?" → query_api("GET", "/items/") - count the array
+- "How many learners?" → query_api("GET", "/learners/") - count the array
+- "Top learner?" → query_api("GET", "/analytics/top-learners")
 
-- Be specific about which file, section, or API endpoint contains the answer
-- If you can't find the answer after reasonable exploration, say so honestly
-- Limit tool calls to what's necessary - don't read every file if you can find the answer more directly
-- For API calls, use GET method for reading data unless POST is specifically needed
+**API status checks:**
+- "What status code?" → query_api("GET", "/items/") - check status_code in response
+- "Endpoint error?" → query_api("GET", "/analytics/completion-rate?lab=lab-99")
+
+**Analytics data:**
+- "Completion rate?" → query_api("GET", "/analytics/completion-rate?lab=lab-X")
+
+### For Bug Diagnosis Questions:
+
+**Division errors:**
+1. query_api to reproduce: query_api("GET", "/analytics/completion-rate?lab=lab-99")
+2. Look for "ZeroDivisionError" or "division by zero" in error
+3. read_file("backend/app/routers/analytics.py") - find division operations
+4. Identify the line with division that has no zero check
+
+**None/TypeError:**
+1. query_api to reproduce: query_api("GET", "/analytics/top-learners?lab=lab-X")
+2. Look for "TypeError" or "NoneType" in error
+3. read_file("backend/app/routers/analytics.py") - find sorted() or operations on potentially None values
+4. Identify where None is not handled
+
+## Step-by-Step Process
+
+1. **Analyze the question type:**
+   - "How many", "count", "how much" → query_api
+   - "what steps", "how to" → wiki (list_files + read_file)
+   - "what framework", "what technique" → source code (read_file)
+   - "what error", "why does it crash" → query_api first, then read_file
+
+2. **Execute tools systematically:**
+   - For wiki: list_files("wiki") first, then read the relevant file
+   - For source: read_file directly if you know the path
+   - For data: query_api with the correct endpoint
+
+3. **Extract the answer:**
+   - From API: count items in the response array
+   - From files: quote the relevant section
+   - From errors: describe the error type and location
+
+4. **Include source reference:**
+   - For wiki: "wiki/git-workflow.md#protecting-a-branch"
+   - For source: "backend/app/main.py" or "Dockerfile"
+   - For API: "GET /items/" endpoint
+
+## Critical Reminders
+
+- ALWAYS use list_files FIRST for wiki questions to discover the right file
+- For "how many items" - query_api("GET", "/items/") and COUNT the returned array
+- For Dockerfile questions - read_file("Dockerfile") and look for multi-stage builds (multiple FROM)
+- For bug questions - reproduce with query_api FIRST, then read the source code
+- When you see division in code, check if there's a zero check - if not, that's the bug
+- When you see sorted() or operations on API data, check if None is handled
 """
 
 
