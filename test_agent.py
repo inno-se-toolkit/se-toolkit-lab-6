@@ -122,3 +122,81 @@ def test_list_files_tool_is_called():
         call.get("tool") == "list_files" for call in tool_calls
     )
     assert list_files_called, "list_files tool was not called"
+
+
+def test_framework_question_uses_read_file():
+    """Test that read_file tool is called when asking about the backend framework.
+
+    When asking "What Python web framework does this project use?",
+    the agent should read backend source code files to find the answer.
+    """
+    project_root = Path(__file__).parent
+
+    result = subprocess.run(
+        ["uv", "run", "agent.py", "What Python web framework does this project use?"],
+        cwd=project_root,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+
+    assert result.returncode == 0, f"Agent failed with: {result.stderr}"
+
+    try:
+        output = json.loads(result.stdout)
+    except json.JSONDecodeError as e:
+        raise AssertionError(f"Agent output is not valid JSON: {result.stdout}") from e
+
+    # Check required fields
+    assert "answer" in output, "Missing 'answer' field"
+    assert "tool_calls" in output, "Missing 'tool_calls' field"
+
+    # Verify read_file was called
+    tool_calls = output["tool_calls"]
+    assert len(tool_calls) > 0, "No tool calls were made"
+
+    read_file_called = any(
+        call.get("tool") == "read_file" for call in tool_calls
+    )
+    assert read_file_called, "read_file tool was not called for framework question"
+
+    # Verify answer contains FastAPI
+    answer = output["answer"].lower()
+    assert "fastapi" in answer, f"Answer should contain 'FastAPI', got: {output['answer']}"
+
+
+def test_query_api_tool_is_called():
+    """Test that query_api tool is called when asking about runtime data.
+
+    When asking "How many items are in the database?",
+    the agent should use query_api to fetch the data.
+    """
+    project_root = Path(__file__).parent
+
+    result = subprocess.run(
+        ["uv", "run", "agent.py", "How many items are in the database?"],
+        cwd=project_root,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+
+    assert result.returncode == 0, f"Agent failed with: {result.stderr}"
+
+    try:
+        output = json.loads(result.stdout)
+    except json.JSONDecodeError as e:
+        raise AssertionError(f"Agent output is not valid JSON: {result.stdout}") from e
+
+    # Check required fields
+    assert "answer" in output, "Missing 'answer' field"
+    assert "tool_calls" in output, "Missing 'tool_calls' field"
+
+    # Verify query_api was called
+    tool_calls = output["tool_calls"]
+    assert len(tool_calls) > 0, "No tool calls were made"
+
+    query_api_called = any(
+        call.get("tool") == "query_api" for call in tool_calls
+    )
+    assert query_api_called, "query_api tool was not called for data question"

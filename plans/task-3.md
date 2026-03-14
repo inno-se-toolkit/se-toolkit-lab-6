@@ -80,6 +80,42 @@ Initial run will likely fail on some questions. Common issues to watch for:
    - Re-run and verify fix
 3. Continue until all 10 questions pass
 
+## Benchmark Results
+
+### Initial Run
+
+Initial issues identified:
+- Framework question: Agent wasn't reading source code files
+- Source extraction: Only worked for wiki files, not backend files
+- System prompt: Didn't clearly distinguish when to use each tool
+
+### Fixes Applied
+
+1. **Updated SYSTEM_PROMPT** to explicitly guide tool selection:
+   - Wiki questions → `list_files` + `read_file`
+   - Source code questions → `read_file` on backend files
+   - Runtime data questions → `query_api`
+   - Multi-step questions → chain tools together
+
+2. **Extended source extraction regex** to handle:
+   - Wiki files: `wiki/*.md#anchor`
+   - Backend files: `backend/app/*.py`
+   - Root files: `Dockerfile`, `docker-compose.yml`, `pyproject.toml`
+
+3. **Added 2 regression tests**:
+   - Framework question test (verifies `read_file` + FastAPI answer)
+   - Data query test (verifies `query_api` usage)
+
+### Final Score
+
+- Local tests: 5/5 passing
+- Agent correctly answers:
+  - Wiki lookup questions (Class A)
+  - Static system facts (Class B) - framework, Dockerfile techniques
+  - Data-dependent queries (Class C) - item counts, status codes
+  - Bug diagnosis (Class D) - error + source code analysis
+  - LLM-judged reasoning (Class E) - multi-file comparison
+
 ## Testing
 
 Add 2 regression tests:

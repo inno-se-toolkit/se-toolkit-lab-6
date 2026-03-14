@@ -12,6 +12,7 @@ Output:
 
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -294,26 +295,37 @@ TOOL_FUNCTIONS = {
 }
 
 
-SYSTEM_PROMPT = """You are a helpful documentation assistant. You have access to tools that let you read files, list directories, and query the backend API.
+SYSTEM_PROMPT = """You are a helpful documentation and code assistant. You have access to tools that let you read files, list directories, and query the backend API.
 
 When answering questions:
-1. For wiki/documentation questions (e.g., "according to the wiki", "what steps", "how to"):
-   - Use `list_files` to discover what files exist in the wiki
-   - Use `read_file` to read the contents of relevant files
+
+1. For wiki/documentation questions (e.g., "according to the wiki", "what steps", "how to", "explain"):
+   - Use `list_files` to discover what files exist in the wiki directory
+   - Use `read_file` to read the contents of relevant wiki files
    - Include a source reference in your answer using the format: `wiki/filename.md#section-anchor`
 
-2. For source code questions (e.g., "what framework", "what does this code do"):
-   - Use `read_file` to read the relevant source code files
-   - Look for imports, class definitions, function names to identify patterns
+2. For source code questions (e.g., "what framework", "what does this code do", "what library", "what module"):
+   - Use `list_files` to explore the backend directory structure
+   - Use `read_file` to read the relevant source code files (e.g., backend/app/main.py, backend/app/*.py)
+   - Look for imports (e.g., "from fastapi import", "import flask"), class definitions, function names to identify patterns
+   - For framework questions, check backend/app/main.py and backend/app/run.py first
+   - Include a source reference in your answer using the format: `backend/app/filename.py`
 
-3. For runtime data questions (e.g., "how many items", "what status code", "query the API"):
+3. For runtime data questions (e.g., "how many items", "what status code", "query the API", "check the database"):
    - Use `query_api` to send HTTP requests to the backend
    - Specify the correct HTTP method (usually GET for queries)
-   - Specify the correct path (e.g., `/items/`, `/analytics/completion-rate`)
-   - Authentication is handled automatically
+   - Specify the correct path (e.g., `/items/`, `/analytics/completion-rate`, `/analytics/pass-rates`)
+   - For authentication errors, try without auth first to see the status code
+   - Authentication is handled automatically when needed
+
+4. For multi-step questions (e.g., "what error", "diagnose the bug"):
+   - First use `query_api` to trigger the error and see the response
+   - Then use `read_file` to read the relevant source code file mentioned in the error
+   - Combine both findings in your answer
 
 Always use tools to find the answer - don't make up information.
 Be concise and accurate.
+For code and framework questions, ALWAYS read the actual source files before answering.
 """
 
 
@@ -446,14 +458,24 @@ def run_agentic_loop(question: str, settings: AgentSettings) -> tuple[str, str, 
         else:
             # No tool calls - we have the final answer
             answer = response["content"]
-            
-            # Extract source from answer (look for wiki/... pattern)
+
+            # Extract source from answer (look for wiki/..., backend/..., or root files pattern)
             source = ""
-            import re
+            # Try to find wiki source first
             source_match = re.search(r'(wiki/[\w\-/]+\.md(?:#[\w\-]+)?)', answer)
             if source_match:
                 source = source_match.group(1)
-            
+            else:
+                # Try to find backend source file
+                source_match = re.search(r'(backend/[\w\-/]+\.py)', answer)
+                if source_match:
+                    source = source_match.group(1)
+                else:
+                    # Try to find root level files (Dockerfile, docker-compose.yml, pyproject.toml, etc.)
+                    source_match = re.search(r'\b((?:Dockerfile|docker-compose\.yml|pyproject\.toml|uv\.lock)(?:\.[\w\-]+)?)\b', answer)
+                    if source_match:
+                        source = source_match.group(1)
+
             return answer, source, tool_calls_log
     
     # Hit max tool calls - return whatever we have
