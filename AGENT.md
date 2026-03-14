@@ -28,3 +28,29 @@
 
 uv run agent.py "What is REST?"
 
+
+
+\## Tools (Task 2)
+
+\- `list\_files(path)`: lists files in a directory
+
+\- `read\_file(path)`: reads file contents
+
+
+
+\## Agentic Loop
+
+1\. Send question + tool definitions to LLM
+
+2\. If tool\_calls → execute, append results, repeat
+
+3\. If no tool\_calls → output final answer with `source`
+
+4\. Max 10 iterations
+
+
+
+\## Security
+
+\- All paths are validated with `safe\_path()` to prevent directory traversal.
+
