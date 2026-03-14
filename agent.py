@@ -298,13 +298,14 @@ You have access to three tools:
 
 **Configuration questions:**
 - "Request lifecycle?" → read_file("docker-compose.yml"), read_file("caddy/Caddyfile"), read_file("Dockerfile"), read_file("backend/app/main.py")
-- "ETL vs API error handling?" → read_file("backend/app/etl.py"), read_file("backend/app/routers/*.py")
+- "ETL vs API error handling?" → read_file("backend/app/routers/pipeline.py") for ETL, read_file("backend/app/routers/analytics.py") for API - compare try/except patterns
 
 **Important file paths:**
 - Dockerfile: "Dockerfile" (at project root)
 - Caddyfile: "caddy/Caddyfile"
 - Main backend: "backend/app/main.py"
-- Routers: "backend/app/routers/items.py", "backend/app/routers/analytics.py", etc.
+- Routers: "backend/app/routers/items.py", "backend/app/routers/analytics.py", "backend/app/routers/pipeline.py"
+- ETL pipeline: "backend/app/routers/pipeline.py"
 
 ### Use `query_api` for:
 
@@ -390,6 +391,16 @@ If a tool returns an error (e.g., "File not found"):
 2. If still not found, continue with other files you CAN read
 3. Provide the best answer you can with available information
 4. Do NOT give up after one error - adapt and continue
+
+## Comparing Error Handling (ETL vs API)
+
+When asked to compare error handling between ETL and API:
+1. Read ETL code: read_file("backend/app/routers/pipeline.py") - look for try/except blocks
+2. Read API code: read_file("backend/app/routers/analytics.py") - look for error responses
+3. Compare:
+   - ETL: Does it catch exceptions? Does it return error details?
+   - API: Does it return 4xx/5xx status codes? Does it log errors?
+4. Explain the difference: ETL may fail silently vs API returns HTTP errors
 """
 
 
