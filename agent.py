@@ -293,12 +293,18 @@ You have access to three tools:
 
 **Source code questions:**
 - "What framework does the backend use?" → read_file("backend/app/main.py") - check imports
-- "What technique in Dockerfile?" → read_file("Dockerfile") - look for FROM statements
+- "What technique in Dockerfile?" → read_file("Dockerfile") - look for FROM statements (note: Dockerfile is at project root, NOT backend/Dockerfile)
 - "Error handling in code?" → read_file the specific file mentioned
 
 **Configuration questions:**
 - "Request lifecycle?" → read_file("docker-compose.yml"), read_file("caddy/Caddyfile"), read_file("Dockerfile"), read_file("backend/app/main.py")
 - "ETL vs API error handling?" → read_file("backend/app/etl.py"), read_file("backend/app/routers/*.py")
+
+**Important file paths:**
+- Dockerfile: "Dockerfile" (at project root)
+- Caddyfile: "caddy/Caddyfile"
+- Main backend: "backend/app/main.py"
+- Routers: "backend/app/routers/items.py", "backend/app/routers/analytics.py", etc.
 
 ### Use `query_api` for:
 
@@ -376,6 +382,14 @@ After you have read 2-3 relevant files OR gotten API responses:
 5. **STOP** - you have enough info, now EXPLAIN the full journey
 
 **DO NOT:** Keep reading files indefinitely. After 3-4 files, you MUST provide an answer.
+
+## Handling Errors
+
+If a tool returns an error (e.g., "File not found"):
+1. Try an alternative path (e.g., "Dockerfile" instead of "backend/Dockerfile")
+2. If still not found, continue with other files you CAN read
+3. Provide the best answer you can with available information
+4. Do NOT give up after one error - adapt and continue
 """
 
 
