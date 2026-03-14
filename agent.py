@@ -9,28 +9,45 @@ import httpx
 from dotenv import load_dotenv
 
 load_dotenv(".env.agent.secret")
+load_dotenv(".env.docker.secret")
 
 API_KEY = os.environ.get("LLM_API_KEY", "")
 API_BASE = os.environ.get("LLM_API_BASE", "").rstrip("/")
 MODEL = os.environ.get("LLM_MODEL", "qwen3-coder-plus")
+LMS_API_KEY = os.environ.get("LMS_API_KEY", "")
+AGENT_API_BASE_URL = os.environ.get("AGENT_API_BASE_URL", "http://localhost:42002").rstrip("/")
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 
 MAX_TOOL_CALLS = 10
 
 SYSTEM_PROMPT = """\
-You are a documentation agent for a software project. \
-Answer the user's question using the project's wiki files.
+You are a system agent for a Learning Management Service project. \
+You can read project files, list directories, and query the deployed backend API.
 
-Steps:
-1. Call list_files with path "wiki" to see available wiki files.
-2. Based on the file names, call read_file on the most relevant file(s).
-3. Find the answer in the file content and respond with:
-   - Your answer to the question.
-   - A source reference in the format: file_path#section-anchor \
-(e.g., wiki/git-workflow.md#resolving-merge-conflicts).
+Choose the right tool for each question:
 
-Always ground your answer in the wiki content. Be concise.\
+- **Wiki / documentation questions** → call list_files("wiki") to discover files, \
+then read_file on the relevant wiki file.
+- **Source code questions** (framework, architecture, routers, code structure) → \
+call list_files on backend directories (e.g., "backend/app", "backend/app/routers"), \
+then read_file on relevant source files. Also read pyproject.toml or docker-compose.yml if needed.
+- **Data questions** (counts, scores, items in the database) → call query_api with the appropriate endpoint. \
+Common endpoints: GET /items/, GET /learners/, GET /analytics/completion-rate?lab=LAB_ID, \
+GET /analytics/top-learners?lab=LAB_ID.
+- **Status code / auth questions** → call query_api to test the endpoint and observe the response.
+- **Bug diagnosis** → first call query_api to trigger the error and see the response, \
+then use list_files and read_file to find and read the relevant source code to identify the bug.
+- **Architecture / request lifecycle** → read docker-compose.yml, Dockerfile, caddy config, \
+and backend source code to trace the full path.
+- **ETL / pipeline questions** → read the ETL pipeline source code (backend/app/etl.py or similar).
+
+When answering:
+- Be concise and specific.
+- If you read a file, include a source reference: file_path#section-anchor.
+- For data questions, include the actual numbers from the API response.
+- For bug diagnosis, identify the specific error type and the buggy line of code.
+- Always use the tools to get real data — never guess or make up answers.\
 """
 
 TOOLS = [
@@ -38,13 +55,13 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "read_file",
-            "description": "Read a file from the project repository.",
+            "description": "Read a file from the project repository. Use for wiki pages, source code, config files.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "path": {
                         "type": "string",
-                        "description": "Relative path from project root.",
+                        "description": "Relative path from project root (e.g., 'wiki/git-workflow.md', 'backend/app/main.py').",
                     }
                 },
                 "required": ["path"],
@@ -55,16 +72,41 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "list_files",
-            "description": "List files and directories at a given path.",
+            "description": "List files and directories at a given path in the project repository.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "path": {
                         "type": "string",
-                        "description": "Relative directory path from project root.",
+                        "description": "Relative directory path from project root (e.g., 'wiki', 'backend/app/routers').",
                     }
                 },
                 "required": ["path"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "query_api",
+            "description": "Send an HTTP request to the deployed backend API. Use for data queries, testing endpoints, checking status codes.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "method": {
+                        "type": "string",
+                        "description": "HTTP method (GET, POST, PUT, DELETE).",
+                    },
+                    "path": {
+                        "type": "string",
+                        "description": "API path (e.g., '/items/', '/analytics/completion-rate?lab=lab-1').",
+                    },
+                    "body": {
+                        "type": "string",
+                        "description": "Optional JSON request body.",
+                    },
+                },
+                "required": ["method", "path"],
             },
         },
     },
@@ -98,9 +140,29 @@ def tool_list_files(path: str) -> str:
     return "\n".join(entries)
 
 
-TOOL_DISPATCH = {
+def tool_query_api(method: str, path: str, body: str | None = None) -> str:
+    url = f"{AGENT_API_BASE_URL}{path}"
+    headers: dict[str, str] = {}
+    if LMS_API_KEY:
+        headers["X-API-Key"] = LMS_API_KEY
+    try:
+        response = httpx.request(
+            method=method.upper(),
+            url=url,
+            headers=headers,
+            content=body.encode() if body else None,
+            timeout=30,
+        )
+        response_body = response.text
+        return json.dumps({"status_code": response.status_code, "body": response_body})
+    except Exception as e:
+        return json.dumps({"status_code": 0, "body": f"Error: {e}"})
+
+
+TOOL_DISPATCH: dict[str, object] = {
     "read_file": tool_read_file,
     "list_files": tool_list_files,
+    "query_api": tool_query_api,
 }
 
 
@@ -165,7 +227,7 @@ def main() -> None:
                 tool_call_log.append({
                     "tool": func_name,
                     "args": func_args,
-                    "result": result_str[:500],  # truncate for output
+                    "result": result_str[:500],
                 })
 
                 messages.append({
@@ -180,10 +242,10 @@ def main() -> None:
                     break
         else:
             # Final text answer
-            answer_text = message.get("content", "")
+            answer_text = (message.get("content") or "")
             break
 
-    # Extract source from the answer if the LLM included it
+    # Extract source from read_file calls
     source = ""
     for log_entry in tool_call_log:
         if log_entry["tool"] == "read_file":

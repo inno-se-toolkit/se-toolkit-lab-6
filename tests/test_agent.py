@@ -16,6 +16,8 @@ def _run_agent(question: str) -> dict:
     return json.loads(result.stdout)
 
 
+# --- Task 1: basic output structure ---
+
 def test_agent_returns_valid_json_with_required_fields():
     data = _run_agent("What is 2+2?")
     assert "answer" in data, "Missing 'answer' field in output"
@@ -24,6 +26,8 @@ def test_agent_returns_valid_json_with_required_fields():
     assert len(data["answer"]) > 0, "'answer' must not be empty"
     assert isinstance(data["tool_calls"], list), "'tool_calls' must be a list"
 
+
+# --- Task 2: documentation agent tools ---
 
 def test_agent_reads_wiki_for_merge_conflict_question():
     data = _run_agent("How do you resolve a merge conflict?")
@@ -39,3 +43,20 @@ def test_agent_lists_wiki_files():
     assert "tool_calls" in data
     tool_names = [tc["tool"] for tc in data["tool_calls"]]
     assert "list_files" in tool_names, "Expected list_files to be called"
+
+
+# --- Task 3: system agent tools ---
+
+def test_agent_reads_source_for_framework_question():
+    data = _run_agent("What Python web framework does this project's backend use?")
+    assert "tool_calls" in data
+    tool_names = [tc["tool"] for tc in data["tool_calls"]]
+    assert "read_file" in tool_names, "Expected read_file to be called for source code question"
+    assert "fastapi" in data["answer"].lower(), "Expected answer to mention FastAPI"
+
+
+def test_agent_queries_api_for_item_count():
+    data = _run_agent("How many items are currently stored in the database?")
+    assert "tool_calls" in data
+    tool_names = [tc["tool"] for tc in data["tool_calls"]]
+    assert "query_api" in tool_names, "Expected query_api to be called for data question"
