@@ -48,16 +48,87 @@ def test_agent_output():
 def test_agent_missing_argument():
     """Test that agent.py shows usage when no argument provided."""
     agent_path = Path(__file__).parent.parent / "agent.py"
-    
+
     result = subprocess.run(
         [sys.executable, str(agent_path)],
         capture_output=True,
         text=True,
         timeout=10,
     )
-    
+
     # Should exit with non-zero code
     assert result.returncode != 0, "Agent should exit with non-zero code when no argument"
-    
+
     # Should show usage message in stderr
     assert "Usage" in result.stderr or "usage" in result.stderr, "Should show usage message"
+
+
+def test_documentation_agent_merge_conflict():
+    """Test that the documentation agent uses read_file for merge conflict question."""
+    agent_path = Path(__file__).parent.parent / "agent.py"
+
+    result = subprocess.run(
+        [sys.executable, str(agent_path), "How do you resolve a merge conflict?"],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+
+    # Check exit code
+    assert result.returncode == 0, f"Agent exited with code {result.returncode}: {result.stderr}"
+
+    # Parse JSON output
+    try:
+        output = json.loads(result.stdout)
+    except json.JSONDecodeError as e:
+        raise AssertionError(f"Invalid JSON output: {e}\nStdout: {result.stdout}\nStderr: {result.stderr}")
+
+    # Check required fields for Task 2
+    assert "answer" in output, "Missing 'answer' field"
+    assert "source" in output, "Missing 'source' field"
+    assert "tool_calls" in output, "Missing 'tool_calls' field"
+
+    # Check that read_file was used
+    tool_calls = output["tool_calls"]
+    assert len(tool_calls) > 0, "Expected at least one tool call"
+
+    tool_names = [tc.get("tool") for tc in tool_calls]
+    assert "read_file" in tool_names, f"Expected read_file in tool calls, got: {tool_names}"
+
+    # Check that source mentions wiki/git-workflow.md
+    source = output.get("source", "")
+    assert "git" in source.lower() or "merge" in source.lower(), \
+        f"Expected git or merge in source, got: {source}"
+
+
+def test_documentation_agent_list_wiki():
+    """Test that the documentation agent uses list_files for wiki listing question."""
+    agent_path = Path(__file__).parent.parent / "agent.py"
+
+    result = subprocess.run(
+        [sys.executable, str(agent_path), "What files are in the wiki?"],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+
+    # Check exit code
+    assert result.returncode == 0, f"Agent exited with code {result.returncode}: {result.stderr}"
+
+    # Parse JSON output
+    try:
+        output = json.loads(result.stdout)
+    except json.JSONDecodeError as e:
+        raise AssertionError(f"Invalid JSON output: {e}\nStdout: {result.stdout}\nStderr: {result.stderr}")
+
+    # Check required fields for Task 2
+    assert "answer" in output, "Missing 'answer' field"
+    assert "source" in output, "Missing 'source' field"
+    assert "tool_calls" in output, "Missing 'tool_calls' field"
+
+    # Check that list_files was used
+    tool_calls = output["tool_calls"]
+    assert len(tool_calls) > 0, "Expected at least one tool call"
+
+    tool_names = [tc.get("tool") for tc in tool_calls]
+    assert "list_files" in tool_names, f"Expected list_files in tool calls, got: {tool_names}"
