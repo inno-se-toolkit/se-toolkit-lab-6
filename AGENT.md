@@ -14,7 +14,7 @@ This document describes the architecture of `agent.py` — a CLI tool that calls
 ## Architecture
 
 ```
-User question → agent.py → LLM API → JSON answer
+User question → agent.py → LLM API → JSON answer.
 ```
 
 ### Components

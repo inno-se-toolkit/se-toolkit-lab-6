@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# n
 """
 agent.py — CLI agent that calls an LLM and returns structured JSON.
 """
