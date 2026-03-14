@@ -164,9 +164,7 @@ Because you used a custom name, your keys are named `se_toolkit_key` (private) a
 
 ### Verify the `SSH` setup
 
-1. [Open a new `VS Code Terminal`](./vs-code.md#open-a-new-vs-code-terminal).
-2. [Check the current shell in the `VS Code Terminal`](./vs-code.md#check-the-current-shell-in-the-vs-code-terminal).
-3. To list the loaded keys,
+1. To list the loaded keys,
 
    [run in the `VS Code Terminal`](./vs-code.md#run-a-command-in-the-vs-code-terminal):
 
@@ -174,9 +172,9 @@ Because you used a custom name, your keys are named `se_toolkit_key` (private) a
    ssh-add -l
    ```
 
-4. You should see your key fingerprint in the output.
+2. You should see your key fingerprint in the output.
 
-5. If you see `The agent has no identities`, run the [start `ssh-agent` step](#start-the-ssh-agent) again.
+3. If you see `The agent has no identities`, run the [start `ssh-agent` step](#start-the-ssh-agent) again.
 
 ## Add the host to `SSH`
 

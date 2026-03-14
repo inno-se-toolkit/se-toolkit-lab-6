@@ -6,6 +6,29 @@ In Task 2 you built an agent that reads documentation. But documentation can be 
 
 You will add a `query_api` tool to the agent you built in Task 2. The agentic loop stays the same — you are just adding one more tool the LLM can call. The agent can now send requests to your deployed backend in addition to reading files.
 
+```mermaid
+sequenceDiagram
+    participant User
+    participant agent.py
+    participant LLM
+    participant Backend as Backend API
+
+    User->>agent.py: CLI arg (question)
+    agent.py->>LLM: question + tool definitions
+    loop Agentic loop (max 10 tool calls)
+        LLM-->>agent.py: tool_calls
+        alt read_file / list_files
+            agent.py->>agent.py: read local file or directory
+        else query_api
+            agent.py->>Backend: HTTP request (LMS_API_KEY)
+            Backend-->>agent.py: {status_code, body}
+        end
+        agent.py->>LLM: tool result
+    end
+    LLM-->>agent.py: text answer (no tool calls)
+    agent.py-->>User: stdout {answer, source, tool_calls}
+```
+
 ## CLI interface
 
 Same rules as Task 2. The only change: `source` is now optional (system questions may not have a wiki source).

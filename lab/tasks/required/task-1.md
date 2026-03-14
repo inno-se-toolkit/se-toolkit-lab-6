@@ -6,8 +6,25 @@ Build a CLI that connects to an LLM and answers questions. This is the foundatio
 
 A `Python` CLI program (`agent.py`) that takes a question, sends it to an LLM, and returns a structured JSON answer. No tools or agentic loop yet — just the basic plumbing: parse input, call the LLM, format output. You will add tools and the agentic loop in Tasks 2–3.
 
-```
-User question → agent.py → LLM API → JSON answer
+```mermaid
+sequenceDiagram
+    box Local machine
+        participant User
+        participant agent.py
+    end
+    box VM
+        participant Proxy as qwen-code-oai-proxy
+    end
+    box Qwen Cloud
+        participant LLM as Qwen 3 Coder
+    end
+
+    User->>agent.py: CLI arg (question)
+    agent.py->>Proxy: POST /v1/chat/completions
+    Proxy->>LLM: proxy request
+    LLM-->>Proxy: response
+    Proxy-->>agent.py: response
+    agent.py-->>User: stdout {answer, tool_calls}
 ```
 
 **Input** — a question as the first command-line argument:

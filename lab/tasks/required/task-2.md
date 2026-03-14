@@ -6,13 +6,21 @@ In Task 1 you built a CLI that calls an LLM, but it still cannot look at your ac
 
 An agentic loop: your code sends the question to the LLM, the LLM decides which tool to call, your code executes it, feeds the result back, and the LLM decides what to do next — call another tool or give the final answer.
 
-```
-Question ──▶ LLM ──▶ tool call? ──yes──▶ execute tool ──▶ back to LLM
-                         │
-                         no
-                         │
-                         ▼
-                    JSON output
+```mermaid
+sequenceDiagram
+    participant User
+    participant agent.py
+    participant LLM
+
+    User->>agent.py: CLI arg (question)
+    agent.py->>LLM: question + tool definitions
+    loop Agentic loop (max 10 tool calls)
+        LLM-->>agent.py: tool_calls
+        agent.py->>agent.py: execute tool (read_file / list_files)
+        agent.py->>LLM: tool result
+    end
+    LLM-->>agent.py: text answer (no tool calls)
+    agent.py-->>User: stdout {answer, source, tool_calls}
 ```
 
 1. Send the user's question + tool definitions to the LLM.
