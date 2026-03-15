@@ -28,3 +28,45 @@ cp .env.agent.example .env.agent.secret
 
 # Run the agent
 uv run agent.py "What does REST stand for?"
+
+## Tools
+
+The agent now has two tools for accessing documentation:
+
+### 1. list_files
+- **Description**: Lists files and directories at a given path
+- **Parameters**: `path` (string) - relative path from project root
+- **Security**: Prevents directory traversal attacks
+- **Use**: First tool to call to discover available wiki files
+
+### 2. read_file
+- **Description**: Reads contents of a file
+- **Parameters**: `path` (string) - relative path from project root
+- **Security**: Validates path to stay within project root
+- **Use**: Read wiki files to find answers
+
+## Agentic Loop
+
+The agent follows this loop:
+1. Send question + tool definitions to LLM
+2. If LLM requests tools → execute them, append results, repeat (max 10 times)
+3. If LLM responds with text → that's the final answer
+4. Output JSON with answer, source, and all tool_calls
+
+## System Prompt
+The system prompt instructs the LLM to:
+- Use list_files first to discover wiki contents
+- Then read_file to examine relevant files
+- Include source references
+- Stop when answer is found
+
+## Output Format
+```json
+{
+  "answer": "Edit the conflicting file, choose which changes to keep, then stage and commit.",
+  "source": "wiki/git-workflow.md#resolving-merge-conflicts",
+  "tool_calls": [
+    {"tool": "list_files", "args": {"path": "wiki"}, "result": "git-workflow.md\n..."},
+    {"tool": "read_file", "args": {"path": "wiki/git-workflow.md"}, "result": "..."}
+  ]
+}
