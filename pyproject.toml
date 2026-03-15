@@ -1,111 +1,16 @@
 [project]
 name = "learning-management-service"
 version = "0.1.0"
-description = "Learning Management Service"
-readme = "README.md"
-requires-python = "==3.14.2"
+description = "Learning Management Service API"
 dependencies = [
-  "asyncpg>=0.30.0",
-  "fastapi==0.128.7",
-  "httpx==0.28.1",
-  "pydantic==2.12.5",
-  "pydantic-settings==2.12.0",
-  "sqlmodel>=0.0.22",
-  "uvicorn[standard]==0.40.0",
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0",
+    "sqlalchemy>=2.0.0",
+    "psycopg2-binary>=2.9.0",
+    "python-dotenv>=1.0.0",
+    "requests>=2.31.0"
 ]
 
-[dependency-groups]
-dev = [
-  "aiosqlite>=0.21.0",
-  "greenlet>=3.2.0",
-  "poethepoet>=0.40.0",
-  "pyright==1.1.408",
-  "pytest==9.0.2",
-  "pytest-asyncio>=0.25.0",
-  "ruff==0.14.14",
-  "ty==0.0.13",
-]
-
-[tool.ruff.lint]
-select = ["RET503"]
-
-[tool.poe.tasks]
-# Run server
-
-## Check code and run server in dev mode
-
-[tool.poe.tasks.dev]
-help = "Run server after static analysis"
-sequence = ["check", "dev-unsafe"]
-
-## Run server
-[tool.poe.tasks.dev-unsafe]
-help = "Run server without static analysis"
-cmd = "python backend/app/run.py"
-
-# Run static analysis
-
-## Run all tools
-
-[tool.poe.tasks.check]
-help = "Format, lint, typecheck"
-sequence = ["format", "lint", "typecheck"]
-
-## Typecheck
-
-[tool.poe.tasks.typecheck]
-help = "Run all typecheckers"
-parallel = ["ty-check", "pyright-check"]
-
-[tool.poe.tasks.ty-check]
-help = "Run the 'ty' typechecker"
-cmd = "ty check"
-
-[tool.poe.tasks.pyright-check]
-help = "Run the 'pyright' typechecker"
-cmd = "pyright"
-
-## Lint
-
-[tool.poe.tasks.lint]
-help = "Run the 'ruff' linter"
-cmd = "ruff check"
-
-## Format
-
-[tool.poe.tasks.format]
-help = "Run the 'ruff' formatter"
-cmd = "ruff format"
-
-# Run dynamic analysis
-
-## Run tests
-
-[tool.poe.tasks.test]
-help = "Run all tests"
-sequence = ["test-unit", "test-e2e"]
-
-[tool.poe.tasks.test-unit]
-help = "Run unit tests"
-cmd = "pytest backend/tests/unit"
-envfile = ".env.tests.unit.secret"
-
-[tool.poe.tasks.test-e2e]
-help = "Run end-to-end tests against the deployed API"
-cmd = "pytest backend/tests/e2e"
-envfile = ".env.tests.e2e.secret"
-
-[tool.pyright]
-include = ["backend"]
-exclude = ["**/__pycache__", "**/node_modules", "**/.*", ".venv", ".direnv"]
-typeCheckingMode = "strict"
-reportAssignmentType = "none"
-reportIncompatibleVariableOverride = "none"
-
-[tool.pytest.ini_options]
-testpaths = ["backend/tests"]
-pythonpath = ["backend"]
-asyncio_mode = "auto"
-
-[tool.ty.src]
-include = ["backend"]
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"

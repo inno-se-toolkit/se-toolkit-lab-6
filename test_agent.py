@@ -159,6 +159,81 @@ def test_path_traversal_security():
     
     print("⚠ No path traversal attempt detected")
 
+def test_agent_query_api_tool():
+    """Test that agent uses query_api tool for data questions."""
+    # Set test environment
+    env = os.environ.copy()
+    env['LMS_API_KEY'] = 'test-key'
+    env['AGENT_API_BASE_URL'] = 'http://localhost:42002'
+    
+    result = subprocess.run(
+        [sys.executable, "agent.py", "How many items are in the database?"],
+        capture_output=True,
+        text=True,
+        env=env
+    )
+    
+    assert result.returncode == 0, f"Agent failed with exit code {result.returncode}"
+    
+    try:
+        output = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        assert False, f"Output is not valid JSON: {result.stdout}"
+    
+    # Check that query_api was called
+    tool_calls = output.get("tool_calls", [])
+    query_api_calls = [tc for tc in tool_calls if tc.get("tool") == "query_api"]
+    
+    assert len(query_api_calls) > 0, "Expected query_api tool call"
+    
+    # Check that it tried to call /items/
+    items_calls = [tc for tc in query_api_calls if "/items/" in tc.get("args", {}).get("path", "")]
+    assert len(items_calls) > 0, "Expected query_api called with /items/ path"
+    
+    print("✓ query_api tool test passed")
+
+def test_agent_chain_tools():
+    """Test that agent can chain multiple tools."""
+    # Set test environment
+    env = os.environ.copy()
+    env['LMS_API_KEY'] = 'test-key'
+    
+    result = subprocess.run(
+        [sys.executable, "agent.py", "Query /analytics/completion-rate for lab-99, find the error, and explain the bug."],
+        capture_output=True,
+        text=True,
+        env=env
+    )
+    
+    assert result.returncode == 0, f"Agent failed with exit code {result.returncode}"
+    
+    try:
+        output = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        assert False, f"Output is not valid JSON: {result.stdout}"
+    
+    # Should have at least 2 tool calls (query_api + read_file)
+    tool_calls = output.get("tool_calls", [])
+    assert len(tool_calls) >= 2, f"Expected at least 2 tool calls, got {len(tool_calls)}"
+    
+    # Check for both tool types
+    tools_used = set(tc.get("tool") for tc in tool_calls)
+    assert "query_api" in tools_used, "Expected query_api tool"
+    assert "read_file" in tools_used or "list_files" in tools_used, "Expected file access tool"
+    
+    print("✓ Tool chaining test passed")
+
+# Обновите запуск тестов в конце файла
+if __name__ == "__main__":
+    test_agent_basic_question()
+    test_agent_list_files_tool()
+    test_agent_read_file_tool()
+    test_agent_query_api_tool()  # New
+    test_agent_chain_tools()      # New
+    test_agent_missing_question()
+    test_path_traversal_security()
+    print("\n✅ All tests passed!")
+
 if __name__ == "__main__":
     test_agent_basic_question()
     test_agent_list_files_tool()
