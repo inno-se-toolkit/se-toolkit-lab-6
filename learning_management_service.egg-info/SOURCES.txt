@@ -1,0 +1,8 @@
+LICENSE
+README.md
+pyproject.toml
+learning_management_service.egg-info/PKG-INFO
+learning_management_service.egg-info/SOURCES.txt
+learning_management_service.egg-info/dependency_links.txt
+learning_management_service.egg-info/requires.txt
+learning_management_service.egg-info/top_level.txt
