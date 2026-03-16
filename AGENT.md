@@ -1,8 +1,10 @@
 # Lab Agent
 
-A CLI tool that connects to an LLM and answers questions. This is the foundation for the agentic system you will build across Tasks 1–3.
+A CLI tool that connects to an LLM and answers questions using tools. The agent can read files and list directories to find accurate information from the project wiki.
 
 ## Architecture
+
+### Task 1: Basic LLM Chat
 
 ```
 ┌─────────────┐     ┌──────────────┐     ┌─────────────────┐
@@ -15,6 +17,28 @@ A CLI tool that connects to an LLM and answers questions. This is the foundation
                     │ .env.agent.  │
                     │   secret     │
                     └──────────────┘
+```
+
+### Task 2+: Agentic Loop with Tools
+
+```
+┌─────────────┐     ┌──────────────┐     ┌─────────────────┐
+│   User CLI  │────▶│   agent.py   │────▶│  LLM Provider   │
+│  (question) │     │  (Agentic    │     │ (Qwen Code API) │
+└─────────────┘     │   Loop)      │     └─────────────────┘
+                    │      │               │
+                    │      ▼               │
+                    │  ┌──────────┐        │
+                    │  │ Tools:   │◀───────┘
+                    │  │ - read   │
+                    │  │ - list   │
+                    │  └──────────┘
+                    │      │
+                    │      ▼
+                    │  Project Files
+                    │  (wiki/, etc.)
+                    ▼
+             JSON Output
 ```
 
 ## LLM Provider
@@ -68,18 +92,31 @@ uv run agent.py "What does REST stand for?"
 
 ### Output
 
-The agent outputs a single JSON line to stdout:
+The agent outputs a single JSON object to stdout:
 
 ```json
-{"answer": "Representational State Transfer.", "tool_calls": []}
+{
+  "answer": "Representational State Transfer.",
+  "source": "wiki/rest-api.md#what-is-rest",
+  "tool_calls": [
+    {"tool": "list_files", "args": {"path": "wiki"}, "result": "rest-api.md\n..."},
+    {"tool": "read_file", "args": {"path": "wiki/rest-api.md"}, "result": "..."}
+  ]
+}
 ```
 
 - `answer`: The LLM's text response
-- `tool_calls`: Empty array (will be populated in Task 2 when tools are added)
+- `source`: The wiki section that answers the question (format: `wiki/filename.md#section`)
+- `tool_calls`: Array of all tool calls made during execution, each with:
+  - `tool`: Tool name (`read_file` or `list_files`)
+  - `args`: Arguments passed to the tool
+  - `result`: The tool's return value
 
 **Important**: Only valid JSON goes to stdout. All debug/log output goes to stderr.
 
 ## How It Works
+
+### Task 1: Basic Flow
 
 1. **Parse CLI argument**: The question is passed as the first command-line argument
 2. **Load configuration**: Environment variables are loaded from `.env.agent.secret`
@@ -88,6 +125,86 @@ The agent outputs a single JSON line to stdout:
 5. **Parse response**: Extract `choices[0].message.content` from the LLM response
 6. **Format output**: Wrap answer in JSON with empty `tool_calls` array
 7. **Print result**: Output JSON to stdout
+
+### Task 2+: Agentic Loop
+
+1. **Initialize messages**: System prompt + user question
+2. **Call LLM with tools**: Send message with tool schemas attached
+3. **Check response**:
+   - If `tool_calls` present: execute each tool, append results, repeat from step 2
+   - If text answer: extract answer + source, return JSON
+4. **Max iterations**: Loop runs at most 10 times to prevent infinite loops
+5. **Output**: JSON with answer, source, and all tool calls made
+
+## Tools
+
+The agent has access to two tools for navigating the project:
+
+### `read_file`
+
+Read the contents of a file from the project repository.
+
+**Parameters:**
+- `path` (string, required): Relative path from project root (e.g., `wiki/git-workflow.md`)
+
+**Returns:**
+- File contents as a string
+- Error message if file doesn't exist or path is invalid
+
+**Security:**
+- Rejects paths containing `..` (directory traversal)
+- Rejects absolute paths starting with `/`
+- Validates resolved path is within project directory
+
+**Example:**
+```python
+read_file("wiki/git-workflow.md")
+# Returns: "# Git Workflow\n\n## Resolving Merge Conflicts\n..."
+```
+
+### `list_files`
+
+List files and directories at a given path.
+
+**Parameters:**
+- `path` (string, required): Relative directory path from project root (e.g., `wiki`)
+
+**Returns:**
+- Newline-separated list of entries
+- Directories are marked with trailing `/`
+- Error message if directory doesn't exist or path is invalid
+
+**Security:**
+- Same path validation as `read_file`
+- Skips hidden files (except `.qwen`) and `__pycache__`
+
+**Example:**
+```python
+list_files("wiki")
+# Returns: "git-workflow.md\nrest-api.md\nssh.md\n..."
+```
+
+## System Prompt Strategy
+
+The system prompt guides the LLM to:
+
+1. **Use tools effectively**: Always use `list_files` to discover wiki structure, then `read_file` to find specific information
+2. **Base answers on evidence**: Answer from actual file contents, not assumptions
+3. **Include source references**: Format as `wiki/filename.md#section-anchor`
+4. **Be concise**: Provide clear, direct answers
+
+Example system prompt excerpt:
+```
+You are a documentation assistant for a software engineering lab.
+You have access to tools to read files and list directories in the project.
+
+When answering questions:
+1. Use list_files to discover what files exist in the wiki/ directory
+2. Use read_file to read the contents of relevant files
+3. Find the specific section that answers the question
+4. Provide a clear answer based on the file contents
+5. Include the source as: wiki/filename.md#section-anchor
+```
 
 ## Error Handling
 

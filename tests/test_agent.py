@@ -80,3 +80,86 @@ class TestAgentOutput:
         # Verify our understanding of the structure
         assert isinstance(expected_structure["answer"], str)
         assert isinstance(expected_structure["tool_calls"], list)
+
+    def test_merge_conflict_question_uses_read_file(self):
+        """
+        Test that asking about merge conflicts triggers read_file tool.
+
+        Expected behavior:
+        - Agent should use list_files to discover wiki files
+        - Agent should use read_file to read wiki/git-workflow.md
+        - Source should reference wiki/git-workflow.md
+        """
+        agent_path = Path(__file__).parent.parent / "agent.py"
+        test_prompt = "How do you resolve a merge conflict?"
+
+        result = subprocess.run(
+            [sys.executable, "-m", "uv", "run", str(agent_path), test_prompt],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+
+        # Parse stdout as JSON
+        try:
+            output = json.loads(result.stdout.strip())
+        except json.JSONDecodeError as e:
+            raise AssertionError(
+                f"agent.py output is not valid JSON: {result.stdout}\n"
+                f"stderr: {result.stderr}"
+            ) from e
+
+        # Check that tool_calls is populated
+        assert isinstance(output["tool_calls"], list), (
+            f"'tool_calls' should be a list. Got: {type(output['tool_calls'])}"
+        )
+
+        # Check that at least one tool call uses read_file
+        tool_names = [call.get("tool") for call in output["tool_calls"]]
+        assert "read_file" in tool_names, (
+            f"Expected 'read_file' in tool_calls. Got: {tool_names}"
+        )
+
+        # Check that source references git-workflow.md
+        source = output.get("source", "")
+        assert "git-workflow.md" in source, (
+            f"Expected 'git-workflow.md' in source. Got: {source}"
+        )
+
+    def test_wiki_files_question_uses_list_files(self):
+        """
+        Test that asking about wiki files triggers list_files tool.
+
+        Expected behavior:
+        - Agent should use list_files to discover wiki files
+        - tool_calls should contain list_files invocation
+        """
+        agent_path = Path(__file__).parent.parent / "agent.py"
+        test_prompt = "What files are in the wiki?"
+
+        result = subprocess.run(
+            [sys.executable, "-m", "uv", "run", str(agent_path), test_prompt],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+
+        # Parse stdout as JSON
+        try:
+            output = json.loads(result.stdout.strip())
+        except json.JSONDecodeError as e:
+            raise AssertionError(
+                f"agent.py output is not valid JSON: {result.stdout}\n"
+                f"stderr: {result.stderr}"
+            ) from e
+
+        # Check that tool_calls is populated
+        assert isinstance(output["tool_calls"], list), (
+            f"'tool_calls' should be a list. Got: {type(output['tool_calls'])}"
+        )
+
+        # Check that at least one tool call uses list_files
+        tool_names = [call.get("tool") for call in output["tool_calls"]]
+        assert "list_files" in tool_names, (
+            f"Expected 'list_files' in tool_calls. Got: {tool_names}"
+        )
