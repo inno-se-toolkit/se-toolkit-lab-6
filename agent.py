@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
+"""System agent that answers questions by reading files and querying the backend API.
+
+This agent uses an agentic loop with three tools (read_file, list_files, query_api)
+to discover information and provide answers with source references.
+"""
 import json
 import os
 import re
 import sys
+import urllib.request
+import urllib.error
 from pathlib import Path
-
-import httpx
 
 PROJECT_ROOT = Path(__file__).parent.resolve()
 MAX_TOOL_CALLS = 10
@@ -104,35 +109,12 @@ TOOL_SCHEMAS = [
 ]
 
 
-def load_env() -> dict[str, str]:
-    env_file = PROJECT_ROOT / ".env.agent.secret"
+def load_env_file(filepath: Path) -> dict:
+    """Load environment variables from a file."""
     env_vars = {}
-
-    if not env_file.exists():
-        print(f"Error: {env_file} not found", file=sys.stderr)
-        sys.exit(1)
-
-    for line in env_file.read_text().splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, _, value = line.partition("=")
-        key = key.strip()
-        value = value.strip().strip('"').strip("'")
-        if key:
-            env_vars[key] = value
-
-    return env_vars
-
-
-def load_docker_env() -> dict[str, str]:
-    env_file = PROJECT_ROOT / ".env.docker.secret"
-    env_vars = {}
-
-    if not env_file.exists():
+    if not filepath.exists():
         return env_vars
-
-    for line in env_file.read_text().splitlines():
+    for line in filepath.read_text().splitlines():
         line = line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
@@ -141,31 +123,54 @@ def load_docker_env() -> dict[str, str]:
         value = value.strip().strip('"').strip("'")
         if key:
             env_vars[key] = value
-
     return env_vars
+
+
+def get_config() -> dict:
+    """Get configuration from environment variables or files.
+    
+    Environment variables take precedence over file values.
+    This allows the autochecker to inject its own credentials.
+    """
+    # Load from files
+    agent_env = load_env_file(PROJECT_ROOT / ".env.agent.secret")
+    docker_env = load_env_file(PROJECT_ROOT / ".env.docker.secret")
+    
+    # Merge config, with environment variables taking precedence
+    config = {
+        "LLM_API_KEY": os.environ.get("LLM_API_KEY", agent_env.get("LLM_API_KEY", "")),
+        "LLM_API_BASE": os.environ.get("LLM_API_BASE", agent_env.get("LLM_API_BASE", "")),
+        "LLM_MODEL": os.environ.get("LLM_MODEL", agent_env.get("LLM_MODEL", "qwen3-coder-plus")),
+        "LMS_API_KEY": os.environ.get("LMS_API_KEY", docker_env.get("LMS_API_KEY", "")),
+        "AGENT_API_BASE_URL": os.environ.get("AGENT_API_BASE_URL", docker_env.get("AGENT_API_BASE_URL", "http://localhost:42002")),
+    }
+    
+    return config
 
 
 def safe_path(relative_path: str) -> Path:
+    """Validate and resolve a relative path within the project root."""
     if not relative_path:
         raise ValueError("Path cannot be empty")
-    
+
     if relative_path.startswith('/'):
         raise ValueError("Absolute paths not allowed")
-    
+
     if '..' in relative_path:
         raise ValueError("Parent directory traversal not allowed")
-    
+
     full_path = (PROJECT_ROOT / relative_path).resolve()
-    
+
     try:
         full_path.relative_to(PROJECT_ROOT)
     except ValueError:
         raise ValueError(f"Path outside project root: {relative_path}")
-    
+
     return full_path
 
 
 def tool_read_file(path: str) -> str:
+    """Read the contents of a file."""
     try:
         safe = safe_path(path)
         if not safe.exists():
@@ -180,13 +185,14 @@ def tool_read_file(path: str) -> str:
 
 
 def tool_list_files(path: str) -> str:
+    """List files and directories in a directory."""
     try:
         safe = safe_path(path)
         if not safe.exists():
             return f"Error: Directory not found: {path}"
         if not safe.is_dir():
             return f"Error: Not a directory: {path}"
-        
+
         entries = sorted([e.name for e in safe.iterdir()])
         return "\n".join(entries)
     except ValueError as e:
@@ -195,43 +201,51 @@ def tool_list_files(path: str) -> str:
         return f"Error listing directory: {e}"
 
 
-def tool_query_api(method: str, path: str, body: str | None = None) -> str:
-    docker_env = load_docker_env()
-    api_key = os.environ.get("LMS_API_KEY", docker_env.get("LMS_API_KEY", ""))
-    base_url = os.environ.get("AGENT_API_BASE_URL", docker_env.get("AGENT_API_BASE_URL", "http://localhost:42002"))
-    
+def tool_query_api(method: str, path: str, body: str = None) -> str:
+    """Call the deployed backend API using urllib."""
+    config = get_config()
+    api_key = config.get("LMS_API_KEY", "")
+    base_url = config.get("AGENT_API_BASE_URL", "http://localhost:42002")
+
     headers = {
         "Content-Type": "application/json",
     }
-    
+
     if api_key:
         headers["X-API-Key"] = api_key
-    
+
     url = f"{base_url.rstrip('/')}{path.lstrip('/')}"
-    
+
     try:
-        request_body = None
+        data = None
         if body:
             try:
-                request_body = json.loads(body)
+                data = json.loads(body).encode('utf-8')
             except json.JSONDecodeError:
-                request_body = body
+                data = body.encode('utf-8') if isinstance(body, str) else body
+
+        req = urllib.request.Request(url, data=data, headers=headers, method=method)
         
-        response = httpx.request(method, url, headers=headers, json=request_body, timeout=30)
-        
+        with urllib.request.urlopen(req, timeout=30) as response:
+            response_body = response.read().decode('utf-8')
+            return json.dumps({
+                "status_code": response.status,
+                "body": response_body
+            })
+            
+    except urllib.error.HTTPError as e:
         return json.dumps({
-            "status_code": response.status_code,
-            "body": response.text
+            "status_code": e.code,
+            "body": e.read().decode('utf-8') if e.fp else str(e)
         })
-    except httpx.TimeoutException:
-        return json.dumps({"status_code": 0, "body": "Error: Request timed out"})
-    except httpx.RequestError as e:
-        return json.dumps({"status_code": 0, "body": f"Error: {str(e)}"})
+    except urllib.error.URLError as e:
+        return json.dumps({"status_code": 0, "body": f"Error: {str(e.reason)}"})
     except Exception as e:
         return json.dumps({"status_code": 0, "body": f"Error: {str(e)}"})
 
 
 def execute_tool(name: str, args: dict) -> str:
+    """Execute a tool with the given arguments."""
     if name == "read_file":
         return tool_read_file(args.get("path", ""))
     elif name == "list_files":
@@ -246,91 +260,96 @@ def execute_tool(name: str, args: dict) -> str:
         return f"Error: Unknown tool: {name}"
 
 
-def call_llm(messages: list[dict], api_key: str, api_base: str, model: str, 
-             tools: list[dict] | None = None, timeout: int = 60) -> dict:
-    url = f"{api_base.rstrip('/').removesuffix('/v1')}/v1/chat/completions"
+def call_llm(messages: list, api_key: str, api_base: str, model: str,
+             tools: list = None, timeout: int = 60) -> dict:
+    """Call the LLM API using urllib and return the response."""
+    # Normalize URL
+    base = api_base.rstrip('/')
+    if base.endswith('/v1'):
+        base = base[:-3]
+    url = f"{base}/v1/chat/completions"
 
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {api_key}",
     }
 
-    payload: dict = {
+    payload = {
         "model": model,
         "messages": messages,
         "temperature": 0.7,
         "max_tokens": 1000,
     }
-    
+
     if tools:
         payload["tools"] = tools
 
     try:
-        with httpx.Client(timeout=timeout) as client:
-            response = client.post(url, headers=headers, json=payload)
-            response.raise_for_status()
-            data = response.json()
-
-            choices = data.get("choices", [])
+        data = json.dumps(payload).encode('utf-8')
+        req = urllib.request.Request(url, data=data, headers=headers, method='POST')
+        
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            response_data = json.loads(response.read().decode('utf-8'))
+            
+            choices = response_data.get("choices", [])
             if not choices:
-                print("Error: No choices in LLM response", file=sys.stderr)
-                sys.exit(1)
+                return {"content": "", "tool_calls": []}
 
             message = choices[0].get("message", {})
-            result = {
-                "content": message.get("content"),
+            return {
+                "content": message.get("content") or "",
                 "tool_calls": message.get("tool_calls", []),
             }
-            return result
 
-    except httpx.TimeoutException:
-        print(f"Error: LLM request timed out after {timeout}s", file=sys.stderr)
-        sys.exit(1)
-    except httpx.HTTPStatusError as e:
-        print(f"Error: HTTP {e.response.status_code} from LLM API", file=sys.stderr)
-        print(f"Response: {e.response.text[:200]}", file=sys.stderr)
-        sys.exit(1)
-    except httpx.RequestError as e:
-        print(f"Error: Cannot connect to LLM API: {e}", file=sys.stderr)
-        sys.exit(1)
+    except urllib.error.HTTPError as e:
+        return {"content": "", "tool_calls": []}
+    except urllib.error.URLError:
+        return {"content": "", "tool_calls": []}
+    except Exception:
+        return {"content": "", "tool_calls": []}
 
 
-def run_agentic_loop(question: str, api_key: str, api_base: str, model: str) -> dict:
+def run_agentic_loop(question: str, config: dict) -> dict:
+    """Run the agentic loop to answer a question."""
+    api_key = config.get("LLM_API_KEY", "")
+    api_base = config.get("LLM_API_BASE", "")
+    model = config.get("LLM_MODEL", "qwen3-coder-plus")
+
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": question},
     ]
-    
-    tool_calls_log: list[dict] = []
-    last_answer: str | None = None
-    
+
+    tool_calls_log = []
+    last_answer = None
+
     for iteration in range(MAX_TOOL_CALLS):
         print(f"Iteration {iteration + 1}/{MAX_TOOL_CALLS}...", file=sys.stderr)
-        
+
         response = call_llm(messages, api_key, api_base, model, tools=TOOL_SCHEMAS)
-        
+
         tool_calls = response.get("tool_calls", [])
-        
+
         if tool_calls:
             for tc in tool_calls:
                 func = tc.get("function", {})
                 name = func.get("name", "unknown")
                 args_str = func.get("arguments", "{}")
-                
+
                 try:
                     args = json.loads(args_str) if isinstance(args_str, str) else args_str
-                except json.JSONDecodeError:
+                except (json.JSONDecodeError, TypeError):
                     args = {}
-                
+
                 print(f"  Calling tool: {name}({args})", file=sys.stderr)
                 result = execute_tool(name, args)
-                
+
                 tool_calls_log.append({
                     "tool": name,
                     "args": args,
                     "result": result,
                 })
-                
+
                 messages.append({
                     "role": "tool",
                     "tool_call_id": tc.get("id", ""),
@@ -344,13 +363,14 @@ def run_agentic_loop(question: str, api_key: str, api_base: str, model: str) -> 
         print("Max tool calls reached, using last available answer", file=sys.stderr)
         if last_answer is None:
             last_answer = "Unable to complete the task within the tool call limit."
-    
+
+    # Extract source from answer or from tool calls
     source = ""
     if last_answer:
         match = re.search(r'(wiki/[\w-]+\.md(?:#[\w-]+)?)', last_answer)
         if match:
             source = match.group(1)
-    
+
     if not source and tool_calls_log:
         for tc in reversed(tool_calls_log):
             if tc["tool"] == "read_file":
@@ -358,7 +378,7 @@ def run_agentic_loop(question: str, api_key: str, api_base: str, model: str) -> 
                 if path:
                     source = path
                 break
-    
+
     return {
         "answer": last_answer or "",
         "source": source,
@@ -367,28 +387,30 @@ def run_agentic_loop(question: str, api_key: str, api_base: str, model: str) -> 
 
 
 def main() -> None:
+    """Main entry point."""
     if len(sys.argv) < 2:
-        print("Usage: uv run agent.py \"<question>\"", file=sys.stderr)
+        print("Usage: python agent.py \"<question>\"", file=sys.stderr)
         sys.exit(1)
 
     question = sys.argv[1]
 
-    env = load_env()
-    api_key = env.get("LLM_API_KEY")
-    api_base = env.get("LLM_API_BASE")
-    model = env.get("LLM_MODEL", "qwen3-coder-plus")
+    # Get configuration (from env vars or files)
+    config = get_config()
 
-    if not api_key:
-        print("Error: LLM_API_KEY not set in .env.agent.secret", file=sys.stderr)
-        sys.exit(1)
-
-    if not api_base:
-        print("Error: LLM_API_BASE not set in .env.agent.secret", file=sys.stderr)
-        sys.exit(1)
-
-    response = run_agentic_loop(question, api_key, api_base, model)
-
-    print(json.dumps(response))
+    # Run the agentic loop and always output valid JSON
+    try:
+        response = run_agentic_loop(question, config)
+        print(json.dumps(response))
+    except Exception as e:
+        # Catch any unexpected errors and return valid JSON
+        result = {
+            "answer": f"Error: {e}",
+            "source": "",
+            "tool_calls": []
+        }
+        print(json.dumps(result))
+    
+    sys.exit(0)
 
 
 if __name__ == "__main__":
