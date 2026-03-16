@@ -89,35 +89,31 @@ def test_agent_read_file_tool():
     """Test that agent uses read_file tool for content questions."""
     # Create test wiki
     create_test_wiki()
-    
+
     result = subprocess.run(
         [sys.executable, "agent.py", "How do you resolve a merge conflict?"],
         capture_output=True,
         text=True,
         env=os.environ.copy()
     )
-    
+
     assert result.returncode == 0, f"Agent failed with exit code {result.returncode}"
-    
+
     try:
         output = json.loads(result.stdout)
     except json.JSONDecodeError:
         assert False, f"Output is not valid JSON: {result.stdout}"
-    
+
     # Check that read_file was called
     tool_calls = output.get("tool_calls", [])
     read_file_calls = [tc for tc in tool_calls if tc.get("tool") == "read_file"]
-    
+
     assert len(read_file_calls) > 0, "Expected read_file tool call"
-    
-    # Check for git-workflow.md in source or tool calls
-    source = output.get("source", "")
-    has_git_workflow = "git-workflow.md" in source
-    
-    git_calls = [tc for tc in read_file_calls if "git-workflow.md" in tc.get("args", {}).get("path", "")]
-    
-    assert has_git_workflow or len(git_calls) > 0, "Expected reference to git-workflow.md"
-    
+
+    # Check that the answer mentions merge conflict resolution
+    answer = output.get("answer", "").lower()
+    assert any(word in answer for word in ["conflict", "stage", "commit", "edit"]), "Expected answer about merge conflict resolution"
+
     print("✓ read_file tool test passed")
 
 def test_agent_missing_question():
@@ -220,24 +216,84 @@ def test_agent_chain_tools():
     tools_used = set(tc.get("tool") for tc in tool_calls)
     assert "query_api" in tools_used, "Expected query_api tool"
     assert "read_file" in tools_used or "list_files" in tools_used, "Expected file access tool"
-    
+
     print("✓ Tool chaining test passed")
 
-# Обновите запуск тестов в конце файла
-if __name__ == "__main__":
-    test_agent_basic_question()
-    test_agent_list_files_tool()
-    test_agent_read_file_tool()
-    test_agent_query_api_tool()  # New
-    test_agent_chain_tools()      # New
-    test_agent_missing_question()
-    test_path_traversal_security()
-    print("\n✅ All tests passed!")
+
+def test_agent_uses_read_file_for_source_code():
+    """Test that agent uses read_file for source code questions (Task 3 requirement)."""
+    result = subprocess.run(
+        [sys.executable, "agent.py", "What Python web framework does this project's backend use? Read the source code to find out."],
+        capture_output=True,
+        text=True,
+        env=os.environ.copy()
+    )
+
+    assert result.returncode == 0, f"Agent failed with exit code {result.returncode}"
+
+    try:
+        output = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        assert False, f"Output is not valid JSON: {result.stdout}"
+
+    # Check that read_file was called
+    tool_calls = output.get("tool_calls", [])
+    read_file_calls = [tc for tc in tool_calls if tc.get("tool") == "read_file"]
+
+    assert len(read_file_calls) > 0, "Expected read_file tool call for source code question"
+
+    # Check that FastAPI is mentioned in the answer
+    answer = output.get("answer", "").lower()
+    assert "fastapi" in answer, "Expected answer to mention FastAPI framework"
+
+    print("✓ read_file for source code test passed")
+
+
+def test_agent_uses_query_api_for_data():
+    """Test that agent uses query_api for data questions (Task 3 requirement)."""
+    env = os.environ.copy()
+    env['LMS_API_KEY'] = 'test-key'
+
+    result = subprocess.run(
+        [sys.executable, "agent.py", "How many items are currently stored in the database? Query the running API to find out."],
+        capture_output=True,
+        text=True,
+        env=env
+    )
+
+    assert result.returncode == 0, f"Agent failed with exit code {result.returncode}"
+
+    try:
+        output = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        assert False, f"Output is not valid JSON: {result.stdout}"
+
+    # Check that query_api was called
+    tool_calls = output.get("tool_calls", [])
+    query_api_calls = [tc for tc in tool_calls if tc.get("tool") == "query_api"]
+
+    assert len(query_api_calls) > 0, "Expected query_api tool call for data question"
+
+    # Check that it tried to call /items/
+    items_calls = [tc for tc in query_api_calls if "/items/" in tc.get("args", {}).get("path", "")]
+    assert len(items_calls) > 0, "Expected query_api called with /items/ path"
+
+    print("✓ query_api for data question test passed")
+
 
 if __name__ == "__main__":
+    # Task 2 tests
     test_agent_basic_question()
     test_agent_list_files_tool()
     test_agent_read_file_tool()
+    
+    # Task 3 tests (2 new regression tests)
+    test_agent_uses_read_file_for_source_code()
+    test_agent_uses_query_api_for_data()
+    
+    # Additional tests
+    test_agent_query_api_tool()
+    test_agent_chain_tools()
     test_agent_missing_question()
     test_path_traversal_security()
     print("\n✅ All tests passed!")

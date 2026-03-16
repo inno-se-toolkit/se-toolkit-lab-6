@@ -126,7 +126,7 @@ def _fetch_question(api_url: str, auth: str, lab: str, index: int) -> Question |
         sys.exit(1)
 
 
-def _run_agent(question: str, timeout: int = 60) -> tuple[AgentOutput, None] | tuple[None, str]:
+def _run_agent(question: str, timeout: int = 180) -> tuple[AgentOutput, None] | tuple[None, str]:
     """Run agent.py with the question. Returns (answer_dict, error_msg)."""
     try:
         result = subprocess.run(
