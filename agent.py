@@ -36,6 +36,10 @@ TOOL SELECTION RULES (follow strictly):
   - For docker-compose questions: read_file on "docker-compose.yml"
   - For ETL pipeline: read_file on "backend/app/etl.py"
   - For analytics bugs: read_file on "backend/app/routers/analytics.py"
+  - For "list all routers" questions: 
+    1. Use list_files on "backend/app/routers"
+    2. Read the docstring (first 10 lines) of each .py file to understand its domain
+    3. List all routers with their domains in your answer
 
 **Live data questions** (e.g., "How many items...", "Query the API", "What status code..."):
   - Use query_api with method="GET" and the appropriate path
@@ -80,13 +84,17 @@ TOOL_SCHEMAS = [
         "type": "function",
         "function": {
             "name": "read_file",
-            "description": "Read the contents of a file from the project. Use for: wiki documentation, source code analysis, configuration files (Dockerfile, docker-compose.yml), ETL pipeline, router files.",
+            "description": "Read the contents of a file from the project. Use for: wiki documentation, source code analysis, configuration files (Dockerfile, docker-compose.yml), ETL pipeline, router files. For large files, use limit_lines to read only the first N lines (e.g., docstrings).",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "path": {
                         "type": "string",
                         "description": "Relative path from project root (e.g., 'wiki/github.md', 'backend/app/main.py', 'Dockerfile', 'docker-compose.yml', 'backend/app/etl.py', 'backend/app/routers/analytics.py')"
+                    },
+                    "limit_lines": {
+                        "type": "integer",
+                        "description": "Optional: read only first N lines (useful for large files or docstrings). Default: read entire file."
                     }
                 },
                 "required": ["path"]
@@ -199,7 +207,7 @@ def safe_path(relative_path: str) -> Path:
     return full_path
 
 
-def tool_read_file(path: str) -> str:
+def tool_read_file(path: str, limit_lines: int = None) -> str:
     """Read the contents of a file."""
     try:
         safe = safe_path(path)
@@ -207,7 +215,15 @@ def tool_read_file(path: str) -> str:
             return f"Error: File not found: {path}"
         if not safe.is_file():
             return f"Error: Not a file: {path}"
+        
+        if limit_lines:
+            # Read only first N lines for large files
+            with open(safe, 'r') as f:
+                lines = [next(f) for _ in range(limit_lines)]
+            return ''.join(lines)
         return safe.read_text()
+    except StopIteration:
+        return f"Error: File shorter than requested"
     except ValueError as e:
         return f"Error: {e}"
     except Exception as e:
@@ -277,7 +293,10 @@ def tool_query_api(method: str, path: str, body: str = None) -> str:
 def execute_tool(name: str, args: dict) -> str:
     """Execute a tool with the given arguments."""
     if name == "read_file":
-        return tool_read_file(args.get("path", ""))
+        return tool_read_file(
+            args.get("path", ""),
+            args.get("limit_lines")
+        )
     elif name == "list_files":
         return tool_list_files(args.get("path", ""))
     elif name == "query_api":
