@@ -207,9 +207,12 @@ Expected:
 
 ## Benchmark Status
 
-**Initial Score:** Pending (requires LLM API credentials)
+**Initial Score:** Cannot test locally - LLM API credentials issue.
 
-**First Failures:** Cannot test locally - LLM API requires Qwen CLI authentication.
+**First Failures:** 
+- Tried OpenRouter with `meta-llama/llama-3.2-3b-instruct:free` - Error: "No endpoints found that support tool use"
+- Tried OpenRouter with `google/gemma-2-9b-it:free` - Error: "No endpoints found"
+- Tried OpenRouter with `meta-llama/llama-3-8b-instruct` - Error: "Insufficient credits"
 
 **Iteration Strategy:**
 1. The code has been implemented with proper tool schemas, authentication, and system prompt
@@ -221,6 +224,9 @@ Expected:
 
 **Notes:**
 - Syntax verified: `uv run python -m py_compile agent.py` passes
-- Backend API verified: `curl http://localhost:42002/items/` returns data
+- Backend API verified: `curl http://localhost:42002/items/` with auth returns data
 - Tool implementations tested manually for correctness
-- Local LLM testing requires Qwen CLI authentication setup
+- Local LLM testing requires either:
+  - Running Qwen Code API locally (not set up)
+  - OpenRouter account with credits
+- The autochecker will evaluate with its own credentials
