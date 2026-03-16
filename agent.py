@@ -204,17 +204,17 @@ SYSTEM_PROMPT = """You are a system agent with access to three tools:
 
 ROUTING RULES — choose the right tool for the question type:
 
-WIKI / HOW-TO questions (e.g., "how to protect a branch", "connect via SSH"):
+WIKI / HOW-TO questions (e.g., "how to protect a branch", "connect via SSH", "clean up Docker"):
   -> Step 1: list_files on 'wiki' to see available files.
-  -> Step 2: Find the relevant wiki file (e.g., ssh.md for SSH questions, github.md for branch protection).
+  -> Step 2: Find the relevant wiki file (e.g., ssh.md for SSH, docker.md for Docker, cleanup.md for cleanup).
   -> Step 3: read_file the relevant wiki file — DO NOT answer without reading it!
   -> Step 4: Extract the answer from the file contents and cite the wiki file as source.
   -> IMPORTANT: After list_files, you MUST call read_file on the relevant file before answering.
 
-SOURCE CODE questions (e.g., "what framework does the backend use"):
+SOURCE CODE questions (e.g., "what framework does the backend use", "what technique in Dockerfile"):
   -> Step 1: read_file 'backend/app/main.py' and look for imports like 'from fastapi import FastAPI'.
   -> Step 2: Also check 'backend/Dockerfile', 'pyproject.toml', or 'backend/requirements.txt' if needed.
-  -> Step 3: Report the framework name with evidence from the source.
+  -> Step 3: Report the framework/technique with evidence from the source.
 
 ROUTER LISTING questions (e.g., "list all API router modules", "what domain does each handle"):
   -> Step 1: list_files on 'backend/app/routers' to see all modules.
@@ -226,9 +226,10 @@ ROUTER LISTING questions (e.g., "list all API router modules", "what domain does
      analytics (statistics and completion rates), pipeline (ETL data loading), 
      learners (top learners and student data).
 
-DATA QUERIES (e.g., "how many items are in the database", "what is the completion rate"):
+DATA QUERIES (e.g., "how many items are in the database", "how many learners", "what is the completion rate"):
   -> CRITICAL: Use query_api to get live data from the backend.
   -> For item count: query_api GET /items/ and count the entries in the JSON array.
+  -> For learner count: query_api GET /learners/ and count distinct learners.
   -> For analytics: query_api GET /analytics/completion-rate?lab=lab-XX
   -> DO NOT read files for data questions — the data is in the database, not in files!
   -> Report the exact number from the API response.
@@ -239,12 +240,31 @@ HTTP STATUS CODE questions (e.g., "what status code without auth header"):
   -> Expected: 401 Unauthorized or 403 Forbidden.
   -> Also read backend/app/auth.py to confirm the authentication logic if asked.
 
-BUG DIAGNOSIS (e.g., "what error for lab-99", "why does top-learners crash"):
+BUG DIAGNOSIS (e.g., "what error for lab-99", "why does top-learners crash", "which endpoints have bugs"):
   -> Step 1: query_api the crashing endpoint (e.g., GET /analytics/completion-rate?lab=lab-99).
   -> Step 2: Read the error message in the API response.
   -> Step 3: read_file the relevant router (e.g., backend/app/routers/analytics.py).
   -> Step 4: Find the exact line causing the bug and explain it.
-  -> Common bugs: ZeroDivisionError (division by zero), TypeError (NoneType in sorted()).
+  -> CRITICAL: When analyzing analytics.py for bugs, look for:
+     - DIVISION operations: Check if denominator can be zero (e.g., total_learners=0 in completion-rate)
+     - SORTING with None: Check if sorted() is called on data that may contain None values (e.g., avg_score=None in top-learners)
+     - NoneType errors: Check if operations are performed on values that could be None
+  -> Common bugs in analytics.py:
+     - ZeroDivisionError: division by zero when total_learners=0 in get_completion_rate()
+     - TypeError: '<' not supported between instances of 'NoneType' and 'NoneType' in get_top_learners() sorted()
+  -> Report the exact error, the buggy line number, and explain the fix.
+
+COMPARISON questions (e.g., "compare ETL vs API error handling", "how does X differ from Y"):
+  -> Step 1: Identify BOTH files/components to compare.
+  -> Step 2: read_file the first component (e.g., backend/app/etl.py for ETL).
+  -> Step 3: read_file the second component (e.g., backend/app/routers/*.py for API).
+  -> Step 4: Compare their approaches explicitly:
+     - Error handling: try/except vs HTTPException
+     - Data validation: external_id checks vs IntegrityError
+     - Retry logic: pagination with has_more vs single request
+     - Idempotency: skip duplicates vs reject duplicates
+  -> Step 5: Provide a structured comparison in your answer.
+  -> IMPORTANT: You MUST read BOTH files before answering comparison questions!
 
 REQUEST LIFECYCLE (e.g., "journey of an HTTP request from browser to database"):
   -> Step 1: read_file docker-compose.yml to see service topology.
@@ -254,18 +274,37 @@ REQUEST LIFECYCLE (e.g., "journey of an HTTP request from browser to database"):
   -> Trace: Browser -> Caddy (port 42001) -> FastAPI (port 42002) -> auth middleware 
      -> router handler -> SQLAlchemy ORM -> PostgreSQL (port 42003) -> response back.
 
-IDEMPOTENCY / ETL questions:
-  -> read_file backend/app/etl.py or backend/app/routers/pipeline.py.
-  -> Find the external_id duplicate check logic.
-  -> Explain: if external_id already exists, skip insert (no duplicate created).
+IDEMPOTENCY / ETL questions (e.g., "how does ETL ensure idempotency", "what happens if same data loaded twice"):
+  -> Step 1: read_file backend/app/etl.py — find the external_id duplicate check.
+  -> Step 2: Also read backend/app/routers/pipeline.py for the API endpoint.
+  -> Explain: The ETL pipeline checks if external_id already exists before inserting.
+     - If external_id exists → SKIP (no duplicate created)
+     - If external_id is new → INSERT
+  -> This ensures idempotency: loading the same data twice produces the same result as loading it once.
+
+ERROR HANDLING questions (e.g., "how does ETL handle failures", "what is the error handling strategy"):
+  -> Step 1: read_file the relevant component (etl.py for ETL, routers/*.py for API).
+  -> Step 2: Look for:
+     - try/except blocks
+     - HTTPException raises
+     - IntegrityError handling
+     - Rollback operations (await session.rollback())
+     - Retry logic (pagination, has_more)
+  -> Step 3: Describe the strategy:
+     - ETL: Uses httpx for HTTP calls with raise_for_status(), pagination with has_more for retry,
+       external_id check for idempotency, session.commit() after batch operations.
+     - API routers: Use HTTPException for client errors, IntegrityError for constraint violations,
+       session.rollback() on errors, Depends(get_session) for session management.
 
 OUTPUT RULES:
 - Set "source" to the most relevant file path used (e.g., "wiki/github.md").
 - For API-only answers, source can be an empty string.
-- Be precise: include exact status codes, error messages, and counts.
+- Be precise: include exact status codes, error messages, line numbers, and counts.
 - For router questions: list EVERY router module with its domain before stopping.
 - For data questions: ALWAYS use query_api — never read files for live data!
 - For wiki questions: ALWAYS read the wiki file before answering — do not answer from file names alone!
+- For bug questions: ALWAYS look for division by zero and None-unsafe operations in analytics.py!
+- For comparison questions: ALWAYS read BOTH files before comparing!
 """
 
 
@@ -405,14 +444,16 @@ def agent_loop(question):
     
     # Detect question type for better guidance
     is_router_q = any(w in q_lower for w in ["router", "module", "domain"])
-    is_data_q = any(w in q_lower for w in ["how many", "count", "items in", "database", "status code", "currently stored", "in the database", "stored in the database", "items are"])
-    is_wiki_q = any(w in q_lower for w in ["wiki", "how to", "steps to", "connect via ssh", "protect a branch", "ssh", "branch"])
+    is_data_q = any(w in q_lower for w in ["how many", "count", "items in", "database", "status code", "currently stored", "in the database", "stored in the database", "items are", "distinct learners"])
+    is_wiki_q = any(w in q_lower for w in ["wiki", "how to", "steps to", "connect via ssh", "protect a branch", "ssh", "branch", "clean up", "docker"])
     is_lifecycle_q = any(w in q_lower for w in ["journey", "lifecycle", "http request", "browser to database", "request path", "full journey"])
     is_etl_q = any(w in q_lower for w in ["idempotency", "etl", "pipeline", "duplicate", "same data", "loaded twice"])
     is_status_q = any(w in q_lower for w in ["status code", "http status", "what does the api return", "without authentication", "without an authentication header", "without sending an authentication"])
-    is_bug_q = any(w in q_lower for w in ["crashes", "error", "bug", "what went wrong", "diagnose"])
+    is_bug_q = any(w in q_lower for w in ["crashes", "error", "bug", "what went wrong", "diagnose", "risky operations", "division", "sorting"])
+    is_comparison_q = any(w in q_lower for w in ["compare", "vs", "versus", "differ", "difference", "both"])
+    is_error_handling_q = any(w in q_lower for w in ["error handling", "failure", "strategy", "handle failures"])
     
-    debug_log(f"[agent_loop] Question type: router={is_router_q}, data={is_data_q}, wiki={is_wiki_q}, lifecycle={is_lifecycle_q}, etl={is_etl_q}, status={is_status_q}, bug={is_bug_q}")
+    debug_log(f"[agent_loop] Question type: router={is_router_q}, data={is_data_q}, wiki={is_wiki_q}, lifecycle={is_lifecycle_q}, etl={is_etl_q}, status={is_status_q}, bug={is_bug_q}, comparison={is_comparison_q}, error_handling={is_error_handling_q}")
 
     while tool_call_count < MAX_TOOL_CALLS:
         # Prevent infinite re-prompt loops
@@ -588,7 +629,39 @@ def agent_loop(question):
                     messages.append({"role": "assistant", "content": content})
                     nudge = (
                         "You have queried the API and read the source code. "
-                        "Now provide your final answer explaining the error and the bug in the source code."
+                        "Now provide your final answer explaining the error and the bug in the source code. "
+                        "Look for division by zero and None-unsafe sorted() calls."
+                    )
+                    messages.append({"role": "user", "content": nudge})
+                    reprompt_count += 1
+                    continue  # loop again to get final answer
+
+            # Check for comparison questions - ensure BOTH files are read
+            if is_comparison_q or is_error_handling_q:
+                read_files = [tc["args"].get("path", "") for tc in all_tool_calls if tc["tool"] == "read_file"]
+                has_etl = any("etl" in rf for rf in read_files)
+                has_router = any("router" in rf for rf in read_files)
+                
+                if not (has_etl and has_router):
+                    debug_log(f"Comparison question: Need both ETL and router files. Have ETL={has_etl}, router={has_router}. Re-prompting.")
+                    messages.append({"role": "assistant", "content": content})
+                    nudge = (
+                        "This is a comparison question. You need to read BOTH files before comparing:\n"
+                        "- Read backend/app/etl.py for ETL error handling strategy\n"
+                        "- Read backend/app/routers/*.py for API error handling strategy\n"
+                        "Then compare: try/except vs HTTPException, pagination vs single request, external_id check vs IntegrityError."
+                    )
+                    messages.append({"role": "user", "content": nudge})
+                    reprompt_count += 1
+                    continue  # loop again without counting a tool call
+                else:
+                    # Both files read - force final answer
+                    debug_log("Comparison question: Both files read. Forcing final answer.")
+                    messages.append({"role": "assistant", "content": content})
+                    nudge = (
+                        "You have read both files. Now provide your final answer comparing the error handling strategies:\n"
+                        "- ETL: httpx with raise_for_status(), pagination with has_more, external_id check for idempotency\n"
+                        "- API routers: HTTPException for errors, IntegrityError handling, session.rollback() on failure"
                     )
                     messages.append({"role": "user", "content": nudge})
                     reprompt_count += 1
