@@ -68,20 +68,37 @@ def list_files(path):
         return f"Error listing directory: {e}"
 
 
-def query_api(method, path, body=None):
-    """Send HTTP request to the backend API."""
+def query_api(method, path, body=None, include_auth=None):
+    """Send HTTP request to the backend API.
+    
+    Args:
+        method: HTTP method (GET, POST, etc.)
+        path: API endpoint path
+        body: Optional JSON request body
+        include_auth: Whether to include auth header. True=yes, False=no, None=use key if available
+    """
     base_url = os.getenv('AGENT_API_BASE_URL', 'http://localhost:42002')
     api_key = os.getenv('LMS_API_KEY')
 
     url = f"{base_url}{path}"
     headers = {}
 
-    # Only add auth header if API key is present and non-empty
-    if api_key and api_key.strip():
-        headers["Authorization"] = f"Bearer {api_key}"
-        debug_log(f"[query_api] Using API key for {method} {url}")
+    # Add auth header based on include_auth parameter
+    if include_auth is True:
+        # Force include auth
+        if api_key and api_key.strip():
+            headers["Authorization"] = f"Bearer {api_key}"
+            debug_log(f"[query_api] Using API key for {method} {url}")
+    elif include_auth is False:
+        # Force exclude auth
+        debug_log(f"[query_api] Making request WITHOUT authentication to {method} {url}")
     else:
-        debug_log(f"[query_api] NO API KEY - making request WITHOUT authentication to {method} {url}")
+        # Use auth if key is available (default behavior)
+        if api_key and api_key.strip():
+            headers["Authorization"] = f"Bearer {api_key}"
+            debug_log(f"[query_api] Using API key for {method} {url}")
+        else:
+            debug_log(f"[query_api] NO API KEY - making request WITHOUT authentication to {method} {url}")
 
     try:
         if body:
@@ -169,7 +186,8 @@ TOOLS = [
             "description": (
                 "Send HTTP requests to the deployed backend API. "
                 "Use this to get real-time data, check API responses, or test endpoints. "
-                "Always use this for questions about HTTP status codes, item counts, or any live data."
+                "Always use this for questions about HTTP status codes, item counts, or any live data. "
+                "For authentication tests, set include_auth=false to omit the API key header."
             ),
             "parameters": {
                 "type": "object",
@@ -189,6 +207,10 @@ TOOLS = [
                     "body": {
                         "type": "string",
                         "description": "Optional JSON request body for POST requests (as a string)"
+                    },
+                    "include_auth": {
+                        "type": "boolean",
+                        "description": "Whether to include API key in Authorization header. Set to false to test unauthenticated access (default: true)"
                     }
                 },
                 "required": ["method", "path"]
@@ -235,8 +257,8 @@ DATA QUERIES (e.g., "how many items are in the database", "how many learners", "
   -> Report the exact number from the API response.
 
 HTTP STATUS CODE questions (e.g., "what status code without auth header"):
-  -> CRITICAL: Use query_api WITHOUT an Authorization header to test the endpoint.
-  -> Call query_api GET /items/ (no auth header) and report the exact status_code.
+  -> CRITICAL: Use query_api with include_auth=false to test the endpoint WITHOUT authentication.
+  -> Call query_api GET /items/ with include_auth=false and report the exact status_code.
   -> Expected: 401 Unauthorized or 403 Forbidden.
   -> Also read backend/app/auth.py to confirm the authentication logic if asked.
 
@@ -387,7 +409,8 @@ def execute_tool_call(tool_call):
             result = query_api(
                 arguments.get("method"),
                 arguments.get("path"),
-                arguments.get("body")
+                arguments.get("body"),
+                arguments.get("include_auth")  # Pass include_auth parameter
             )
         else:
             result = f"Error: Unknown tool {function_name}"
