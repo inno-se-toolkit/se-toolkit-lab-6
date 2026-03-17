@@ -592,7 +592,7 @@ def run_agentic_loop(question: str, api_key: str, api_base: str, model: str) -> 
             ]
             
             # Also increase max force continues
-            max_force_continue = 10
+            max_force_continue = 3
             
             answer_lower = answer.lower()
             is_incomplete = any(indicator in answer_lower for indicator in incomplete_indicators)
@@ -611,7 +611,7 @@ def run_agentic_loop(question: str, api_key: str, api_base: str, model: str) -> 
                 })
                 messages.append({
                     "role": "user",
-                    "content": "STOP. Do NOT provide any answer yet. Continue using tools to gather ALL information first. Only when you have read ALL relevant files and have COMPLETE information, then provide the full answer. Use read_file on every file in the directory.",
+                    "content": "STOP exploring. You have enough information. Provide your FINAL complete answer NOW based on what you've already learned. Do NOT use any more tools - just give the complete answer.",
                 })
                 tool_call_count += 1  # Count this as an iteration
                 continue
