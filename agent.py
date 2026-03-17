@@ -20,6 +20,10 @@ MAX_TOOL_CALLS = 10
 
 SYSTEM_PROMPT = """You are a system agent that answers questions by reading project files and querying the backend API.
 
+CRITICAL RULE: You MUST use tools to gather information. Never answer from your own knowledge.
+- For ANY question about this project, use tools to find the answer
+- Only provide a final answer after you have used tools and gathered information
+
 You have access to three tools:
 1. list_files - List files and directories in a given path
 2. read_file - Read the contents of a file
@@ -85,6 +89,7 @@ IMPORTANT TIPS:
 - For Dockerfile questions about layers or optimization, read the entire Dockerfile
 - Always read the actual file content - don't guess
 - For bug questions, FIRST query the API to see the error, THEN read the source code
+- NEVER answer from your own knowledge - ALWAYS use tools first
 
 When you have enough information to answer, provide your final answer without calling more tools.
 Include source references when applicable (e.g., "wiki/github.md", "backend/app/main.py").
@@ -352,27 +357,46 @@ def call_llm(messages: list, api_key: str, api_base: str, model: str,
     """Call the LLM API using urllib and return the response."""
     print(f"\n[DEBUG] Calling LLM with model: {model}", file=sys.stderr)
     print(f"[DEBUG] API Base: {api_base}", file=sys.stderr)
-    
+
     if not api_base:
         print("[ERROR] LLM_API_BASE is missing", file=sys.stderr)
         return {"content": "Error: Missing API base URL", "tool_calls": []}
 
     # Handle different API base formats
     base = api_base.rstrip('/')
-    
+
+    # Extract host and port for connectivity check
+    try:
+        parsed = urllib.parse.urlparse(base)
+        host = parsed.hostname
+        port = parsed.port or (443 if parsed.scheme == 'https' else 80)
+        print(f"[DEBUG] Checking connectivity to {host}:{port}", file=sys.stderr)
+        
+        # Quick connectivity check with 3 second timeout
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(3)
+        result = sock.connect_ex((host, port))
+        sock.close()
+        if result != 0:
+            print(f"[ERROR] Cannot connect to {host}:{port} - {os.strerror(result)}", file=sys.stderr)
+            return {"content": f"Error: Cannot connect to LLM API at {host}:{port}", "tool_calls": []}
+    except Exception as e:
+        print(f"[DEBUG] Connectivity check failed: {e}", file=sys.stderr)
+        # Continue anyway, the actual request might work
+
     # For VM API, the endpoint might be different
     # Try different endpoint patterns
     urls_to_try = [
+        f"{base}/chat/completions",      # Without /v1 (common for local APIs)
         f"{base}/v1/chat/completions",  # Standard OpenAI format
-        f"{base}/chat/completions",      # Without /v1
         f"{base}/completions",            # Legacy completions
     ]
-    
+
     # Set up headers - VM API might not need auth
     headers = {
         "Content-Type": "application/json",
     }
-    
+
     # Only add auth if key exists and doesn't look like a placeholder
     if api_key and api_key not in ["not-needed", "EMPTY", ""]:
         headers["Authorization"] = f"Bearer {api_key}"
@@ -392,20 +416,22 @@ def call_llm(messages: list, api_key: str, api_base: str, model: str,
     data = json.dumps(payload).encode('utf-8')
     print(f"[DEBUG] Request payload size: {len(data)} bytes", file=sys.stderr)
 
-    # Try each URL pattern
+    # Try each URL pattern with a shorter per-call timeout
+    # This allows multiple attempts within the overall timeout
+    per_call_timeout = min(timeout, 20)  # Max 20s per attempt
     last_error = None
     for url in urls_to_try:
         try:
             print(f"[DEBUG] Trying URL: {url}", file=sys.stderr)
-            
+
             req = urllib.request.Request(url, data=data, headers=headers, method='POST')
-            
+
             # Create context that doesn't verify SSL
             context = ssl._create_unverified_context()
-            
-            with urllib.request.urlopen(req, context=context, timeout=timeout) as response:
+
+            with urllib.request.urlopen(req, context=context, timeout=per_call_timeout) as response:
                 response_data = json.loads(response.read().decode('utf-8'))
-                
+
                 choices = response_data.get("choices", [])
                 if not choices:
                     print("[ERROR] No choices in LLM response", file=sys.stderr)
@@ -415,12 +441,15 @@ def call_llm(messages: list, api_key: str, api_base: str, model: str,
                 content = message.get("content")
                 if content is None:
                     content = ""
-                
-                tool_calls = message.get("tool_calls", [])
-                
+
+                # Handle tool_calls - might be None, empty list, or not present
+                tool_calls = message.get("tool_calls")
+                if tool_calls is None:
+                    tool_calls = []
+
                 print(f"[DEBUG] Got response with content length: {len(content)}", file=sys.stderr)
                 print(f"[DEBUG] Tool calls: {len(tool_calls)}", file=sys.stderr)
-                
+
                 return {
                     "content": content,
                     "tool_calls": tool_calls,
@@ -431,17 +460,22 @@ def call_llm(messages: list, api_key: str, api_base: str, model: str,
             print(f"[DEBUG] HTTP {e.code} from {url}: {error_body[:200]}", file=sys.stderr)
             last_error = f"HTTP {e.code}"
             continue
-            
+
         except urllib.error.URLError as e:
             print(f"[DEBUG] Cannot connect to {url}: {e.reason}", file=sys.stderr)
             last_error = f"Connection error: {e.reason}"
             continue
-            
+
         except socket.timeout:
             print(f"[DEBUG] Timeout connecting to {url}", file=sys.stderr)
             last_error = "Timeout"
             continue
-            
+
+        except socket.error as e:
+            print(f"[DEBUG] Socket error with {url}: {e}", file=sys.stderr)
+            last_error = f"Socket error: {e}"
+            continue
+
         except Exception as e:
             print(f"[DEBUG] Unexpected error with {url}: {type(e).__name__}: {e}", file=sys.stderr)
             last_error = f"{type(e).__name__}"
@@ -465,12 +499,16 @@ def run_agentic_loop(question: str, config: dict) -> dict:
 
     tool_calls_log = []
     last_answer = None
+    has_used_tools = False
+    seen_tool_calls = set()  # Prevent infinite loops from duplicate tool calls
 
     try:
         for iteration in range(MAX_TOOL_CALLS):
             print(f"\n=== Iteration {iteration + 1}/{MAX_TOOL_CALLS} ===", file=sys.stderr)
 
-            response = call_llm(messages, api_key, api_base, model, tools=TOOL_SCHEMAS, timeout=30)
+            # Use shorter timeout per call to stay within 180s total
+            # With max 10 iterations, 15s per call = 150s max
+            response = call_llm(messages, api_key, api_base, model, tools=TOOL_SCHEMAS, timeout=15)
 
             # Check if we got an error
             content = response.get("content", "")
@@ -486,6 +524,21 @@ def run_agentic_loop(question: str, config: dict) -> dict:
             if tool_calls:
                 print(f"  Tool calls requested: {len(tool_calls)}", file=sys.stderr)
                 
+                # Check for duplicate tool calls (prevent infinite loops)
+                current_calls = tuple(sorted([
+                    f"{tc.get('function', {}).get('name', tc.get('name', 'unknown'))}:"
+                    f"{tc.get('function', {}).get('arguments', tc.get('arguments', '{}'))}"
+                    if isinstance(tc, dict) else str(tc)
+                    for tc in tool_calls
+                ]))
+                if current_calls in seen_tool_calls:
+                    print(f"  Duplicate tool calls detected, stopping", file=sys.stderr)
+                    last_answer = "Error: LLM returned duplicate tool calls"
+                    break
+                seen_tool_calls.add(current_calls)
+                
+                has_used_tools = True
+
                 for tc in tool_calls:
                     try:
                         # Handle different tool call formats
@@ -498,7 +551,7 @@ def run_agentic_loop(question: str, config: dict) -> dict:
                                 func = tc
                         else:
                             func = {}
-                        
+
                         name = func.get("name", "unknown")
                         args_str = func.get("arguments", "{}")
 
@@ -530,16 +583,29 @@ def run_agentic_loop(question: str, config: dict) -> dict:
                             "tool_call_id": tool_call_id,
                             "content": result,
                         })
-                        
+
                         print(f"  <- Tool result: {result[:100]}...", file=sys.stderr)
-                        
+
                     except Exception as e:
                         print(f"  Error processing tool call: {e}", file=sys.stderr)
                         continue
             else:
-                last_answer = content
-                print(f"  Final answer received", file=sys.stderr)
-                break
+                # No tool calls - only accept as final answer if we've already used tools
+                if has_used_tools:
+                    last_answer = content
+                    print(f"  Final answer received", file=sys.stderr)
+                    break
+                else:
+                    # No tools used yet - prompt LLM to use tools
+                    print(f"  No tool calls - prompting LLM to use tools", file=sys.stderr)
+                    messages.append({
+                        "role": "assistant",
+                        "content": content,
+                    })
+                    messages.append({
+                        "role": "user",
+                        "content": "Please use the available tools (list_files, read_file, or query_api) to gather information before answering. Do not answer from your own knowledge.",
+                    })
         else:
             print("Max tool calls reached, using last available answer", file=sys.stderr)
             if last_answer is None:
