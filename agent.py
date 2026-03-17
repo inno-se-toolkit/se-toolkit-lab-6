@@ -444,11 +444,11 @@ def agent_loop(question):
     
     # Detect question type for better guidance
     is_router_q = any(w in q_lower for w in ["router", "module", "domain"])
-    is_data_q = any(w in q_lower for w in ["how many", "count", "items in", "database", "status code", "currently stored", "in the database", "stored in the database", "items are", "distinct learners"])
+    is_data_q = any(w in q_lower for w in ["how many", "count", "items in", "database", "currently stored", "in the database", "stored in the database", "items are", "distinct learners"])
     is_wiki_q = any(w in q_lower for w in ["wiki", "how to", "steps to", "connect via ssh", "protect a branch", "ssh", "branch", "clean up", "docker"])
     is_lifecycle_q = any(w in q_lower for w in ["journey", "lifecycle", "http request", "browser to database", "request path", "full journey"])
     is_etl_q = any(w in q_lower for w in ["idempotency", "etl", "pipeline", "duplicate", "same data", "loaded twice"])
-    is_status_q = any(w in q_lower for w in ["status code", "http status", "what does the api return", "without authentication", "without an authentication header", "without sending an authentication"])
+    is_status_q = any(w in q_lower for w in ["status code", "http status", "what does the api return", "without authentication", "without an authentication header", "without sending an authentication", "without auth"])
     is_bug_q = any(w in q_lower for w in ["crashes", "error", "bug", "what went wrong", "diagnose", "risky operations", "division", "sorting"])
     is_comparison_q = any(w in q_lower for w in ["compare", "vs", "versus", "differ", "difference", "both"])
     is_error_handling_q = any(w in q_lower for w in ["error handling", "failure", "strategy", "handle failures"])
