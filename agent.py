@@ -20,7 +20,7 @@ from openai import OpenAI
 
 
 # Maximum number of tool calls per question
-MAX_TOOL_CALLS = 10
+MAX_TOOL_CALLS = 15
 
 # System prompt for the documentation agent
 SYSTEM_PROMPT = """You are a documentation assistant for a software engineering lab.
@@ -37,10 +37,25 @@ When answering questions:
 
 Tool selection guide:
 - For static questions about the codebase (framework, ports, structure), use read_file on source code
-- For data-dependent questions (counts, scores, live data), use query_api
+- For data-dependent questions (counts, scores, live data), use query_api with auth=true (default)
 - For wiki/documentation questions, use list_files and read_file on wiki/
+- To test unauthenticated access (e.g., "what status code without auth?"), use query_api with auth=false
+
+IMPORTANT: All paths must be relative to the project root. For example:
+- To list backend app files: use list_files("backend/app")
+- To read a router: use read_file("backend/app/routers/items.py")
+- To list wiki files: use list_files("wiki")
 
 Always use tools to find accurate information. Do not make assumptions about file contents.
+
+SOURCE REFERENCE: At the end of your answer, always include a "Source:" line with the file path(s) you used:
+- For wiki files: Source: wiki/filename.md#section
+- For source files: Source: backend/app/routers/items.py
+- For API queries: Source: query_api GET /path
+
+This is REQUIRED - always include at least one source reference.
+
+RESPONSE FORMAT: Your final answer must be complete and self-contained. When asked to list multiple items (like router modules), read all relevant files and provide a comprehensive summary. Never say "let me check" or "I'll continue" - gather all information first, then provide the complete answer.
 """
 
 
@@ -154,7 +169,7 @@ class Agent:
                 "type": "function",
                 "function": {
                     "name": "query_api",
-                    "description": "Query the backend API. Use for data-dependent questions like item counts, analytics, or testing endpoints.",
+                    "description": "Query the backend API. Use for data-dependent questions like item counts, analytics, or testing endpoints. Set auth=false to test unauthenticated access.",
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -169,6 +184,10 @@ class Agent:
                             "body": {
                                 "type": "string",
                                 "description": "Optional JSON request body for POST/PUT requests"
+                            },
+                            "auth": {
+                                "type": "boolean",
+                                "description": "Whether to include authentication header (default: true). Set to false to test unauthenticated access."
                             }
                         },
                         "required": ["method", "path"]
@@ -288,32 +307,34 @@ class Agent:
         except Exception as e:
             return f"Error listing directory: {str(e)}"
 
-    def query_api(self, method: str, path: str, body: str | None = None) -> str:
+    def query_api(self, method: str, path: str, body: str | None = None, auth: bool = True) -> str:
         """
-        Query the backend API with LMS_API_KEY authentication.
+        Query the backend API with optional LMS_API_KEY authentication.
 
         Args:
             method: HTTP method (GET, POST, PUT, DELETE, etc.)
             path: API path (e.g., '/items/', '/analytics/completion-rate')
             body: Optional JSON request body for POST/PUT requests
+            auth: Whether to include authentication header (default: True)
 
         Returns:
             JSON string with status_code and body, or error message
         """
-        print(f"Tool call: query_api({method} {path})", file=sys.stderr)
-
-        # Check if API key is configured
-        if not self.lms_api_key:
-            return "Error: LMS_API_KEY not configured"
+        print(f"Tool call: query_api({method} {path}, auth={auth})", file=sys.stderr)
 
         # Build the URL
         url = f"{self.agent_api_base_url}{path}"
 
         # Prepare headers
         headers = {
-            "Authorization": f"Bearer {self.lms_api_key}",
             "Content-Type": "application/json",
         }
+        
+        # Add authentication if requested
+        if auth and self.lms_api_key:
+            headers["Authorization"] = f"Bearer {self.lms_api_key}"
+        elif auth and not self.lms_api_key:
+            return "Error: LMS_API_KEY not configured"
 
         try:
             # Make the request
@@ -368,7 +389,8 @@ class Agent:
             return self.query_api(
                 args.get("method", "GET"),
                 args.get("path", ""),
-                args.get("body")
+                args.get("body"),
+                args.get("auth", True)  # Default to authenticated
             )
         else:
             return f"Error: Unknown tool: {tool_name}"
@@ -518,6 +540,8 @@ class Agent:
         - wiki/filename.md#section
         - (wiki/filename.md#section)
         - Source: wiki/filename.md#section
+        - Source: backend/app/routers/items.py
+        - Source: query_api GET /path
 
         Args:
             answer: The LLM's answer text
@@ -547,6 +571,21 @@ class Agent:
         match = re.search(wiki_file_pattern, answer)
         if match:
             return match.group(0)
+
+        # Try to find backend source file references
+        backend_pattern = r"backend/[\w/.-]+"
+        match = re.search(backend_pattern, answer)
+        if match:
+            source = match.group(0)
+            # Clean up trailing punctuation
+            source = source.rstrip(".,;:")
+            return source
+
+        # Try to find query_api source references
+        api_pattern = r"Source:\s*query_api\s+(GET|POST|PUT|DELETE)\s+[\w/.-]+"
+        match = re.search(api_pattern, answer)
+        if match:
+            return match.group(0).replace("Source: ", "")
 
         return ""
 
