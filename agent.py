@@ -9,7 +9,8 @@ import requests
 from dotenv import load_dotenv
 import argparse
 
-# Load environment variables from both secret files (if they exist)
+# Load environment variables from all env files (if they exist)
+load_dotenv('.env')
 load_dotenv('.env.agent.secret')
 load_dotenv('.env.docker.secret')
 
