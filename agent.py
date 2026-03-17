@@ -487,6 +487,21 @@ def agent_loop(question):
         if not has_tool_calls:
             # LLM thinks it is done — check for incomplete answers
             
+            # For bug questions - check if we already forced final answer
+            already_forced_bug = any(tc.get("tool") == "forced_final_answer" for tc in all_tool_calls)
+            if is_bug_q and already_forced_bug:
+                debug_log("Bug question: Already forced final answer. Returning current content.")
+                source = ""
+                for tc in reversed(all_tool_calls):
+                    if tc["tool"] == "read_file":
+                        source = tc["args"].get("path", "")
+                        break
+                return {
+                    "answer": content,
+                    "source": source,
+                    "tool_calls": [tc for tc in all_tool_calls if tc.get("tool") != "forced_final_answer"]
+                }
+
             # Check for incomplete router answers
             if is_router_q:
                 read_basenames = _get_read_basenames(all_tool_calls)
@@ -624,17 +639,20 @@ def agent_loop(question):
                 has_read_file = any(tc["tool"] == "read_file" for tc in all_tool_calls)
 
                 if has_query_api and has_read_file:
-                    # Both done - force final answer
-                    debug_log("Bug question: API queried and source read. Forcing final answer.")
-                    messages.append({"role": "assistant", "content": content})
-                    nudge = (
-                        "You have queried the API and read the source code. "
-                        "Now provide your final answer explaining the error and the bug in the source code. "
-                        "Look for division by zero and None-unsafe sorted() calls."
-                    )
-                    messages.append({"role": "user", "content": nudge})
-                    reprompt_count += 1
-                    continue  # loop again to get final answer
+                    # Both done - force final answer (only once)
+                    if not any(tc.get("forced_final_answer") for tc in all_tool_calls):
+                        debug_log("Bug question: API queried and source read. Forcing final answer.")
+                        messages.append({"role": "assistant", "content": content})
+                        nudge = (
+                            "You have queried the API and read the source code. "
+                            "Now provide your final answer explaining the error and the bug in the source code. "
+                            "Look for division by zero and None-unsafe sorted() calls."
+                        )
+                        messages.append({"role": "user", "content": nudge})
+                        # Mark that we forced final answer
+                        all_tool_calls.append({"tool": "forced_final_answer", "args": {}, "result": "forced"})
+                        reprompt_count += 1
+                        continue  # loop again to get final answer
 
             # Check for comparison questions - ensure BOTH files are read
             if is_comparison_q or is_error_handling_q:
@@ -701,11 +719,14 @@ def agent_loop(question):
         if not valid_tool_calls:
             debug_log("No valid tool calls found.")
             
+            # Track if we already forced final answer for bug questions
+            already_forced_bug = any(tc.get("tool") == "forced_final_answer" for tc in all_tool_calls)
+            
             # For router questions, check if we need to read more files
-            if is_router_q:
+            if is_router_q and not already_forced_bug:
                 read_basenames = _get_read_basenames(all_tool_calls)
                 missing_routers = ROUTER_FILES - read_basenames
-                
+
                 if missing_routers:
                     debug_log(f"Router question: Missing routers {missing_routers}. Re-prompting.")
                     messages.append({"role": "assistant", "content": content})
@@ -716,7 +737,21 @@ def agent_loop(question):
                     messages.append({"role": "user", "content": nudge})
                     reprompt_count += 1
                     continue  # loop again without counting a tool call
-            
+
+            # For bug questions after forcing - just return the answer
+            if is_bug_q and already_forced_bug:
+                debug_log("Bug question: Already forced final answer. Returning current content.")
+                source = ""
+                for tc in reversed(all_tool_calls):
+                    if tc["tool"] == "read_file":
+                        source = tc["args"].get("path", "")
+                        break
+                return {
+                    "answer": content,
+                    "source": source,
+                    "tool_calls": [tc for tc in all_tool_calls if tc.get("tool") != "forced_final_answer"]
+                }
+
             # For other questions, treat as final answer
             source = ""
             for tc in reversed(all_tool_calls):
