@@ -4,6 +4,8 @@
 
 `agent.py` is a CLI tool that connects to an LLM and answers questions by reading project documentation, analyzing source code, and querying the deployed backend API. It uses an agentic loop with three tools (`read_file`, `list_files`, `query_api`) to discover information and provide answers with source references.
 
+The agent implements a true agentic workflow: it receives a question, decides which tools to call based on the question type, executes those tools, feeds the results back to the LLM, and iterates until it has enough information to provide a complete answer. This allows it to handle complex multi-step questions that require gathering information from multiple sources.
+
 ## Architecture
 
 ```
@@ -90,19 +92,36 @@ Call the deployed backend API with authentication.
 
 **Parameters:**
 - `method` (string) - GET, POST, PUT, DELETE
-- `path` (string) - API path (e.g., `/items/`)
-- `body` (string, optional) - JSON request body
+- `path` (string) - API path (e.g., `/items/`, `/analytics/completion-rate?lab=lab-99`)
+- `body` (string, optional) - JSON request body for POST/PUT requests
 
-**Authentication:** Uses `LMS_API_KEY` as `X-API-Key` header
+**Authentication:** Uses `LMS_API_KEY` from environment variables as `X-API-Key` header. This is separate from the LLM API key.
 
-**Returns:** JSON with `status_code` and `body`
+**Returns:** JSON string with `status_code` (integer) and `body` (string containing response body).
+
+**Common endpoints:**
+- `GET /items/` - List all items (for counting items in database)
+- `GET /learners/` - List all learners (for counting learners)
+- `GET /analytics/completion-rate?lab=lab-XX` - Get completion rate for a lab
+- `GET /analytics/top-learners?lab=lab-XX` - Get top learners for a lab
+
+**Error handling:** Returns status_code 0 with error message for connection failures. HTTP errors (4xx, 5xx) are captured and returned with the error response body.
 
 ## System Prompt
 
-The system prompt guides tool selection:
+The system prompt is critical for guiding tool selection. It organizes questions into five categories with explicit instructions for each:
 
-- Use `list_files`/`read_file` for wiki questions, source code analysis, configuration
-- Use `query_api` for live data queries, testing endpoints, status codes, counts
+**Wiki/documentation questions:** Use `list_files("wiki")` to discover files, then `read_file` on the specific wiki file (e.g., `wiki/github.md` for branch protection, `wiki/docker.md` for cleanup).
+
+**Source code questions:** Use `read_file` on backend files. Check imports in `backend/app/main.py` for framework detection. For Dockerfile/docker-compose questions, read those files directly.
+
+**Live data questions:** Use `query_api` with `GET` method. Common paths include `/items/` for counting, `/learners/` for learner counts, `/analytics/*` for analytics data.
+
+**Bug diagnosis questions:** First use `query_api` to trigger and observe the error, then use `read_file` on the source code to find the buggy line. Look for division operations (ZeroDivisionError risk) or sorting with None values (TypeError risk).
+
+**Reasoning questions:** Use multiple `read_file` calls to gather context from different files, then synthesize the information.
+
+This categorization ensures the LLM selects the appropriate tool for each question type.
 
 ## Agentic Loop
 
@@ -152,7 +171,7 @@ Building this agent taught me several important lessons about working with LLMs 
 
 **Second, environment variable handling is tricky.** I initially hardcoded the backend URL, which worked locally but would fail the autochecker. The key insight is that the autochecker injects its own values, so the agent must read from environment variables, not hardcoded strings. I also learned that `LMS_API_KEY` (backend auth) and `LLM_API_KEY` (LLM provider auth) are completely separate credentials from different files. The agent reads `LLM_API_KEY`, `LLM_API_BASE`, `LLM_MODEL` from `.env.agent.secret` (or environment), and `LMS_API_KEY`, `AGENT_API_BASE_URL` from `.env.docker.secret` (or environment).
 
-**Third, the LLM sometimes returns `content: null` when making tool calls, not `content: ""`.** Using `msg.get("content") or ""` instead of `msg.get("content", "")` fixed crashes where the agent would fail on `None` values. This is a subtle but important distinction — the field exists but is null, not missing.
+**Third, the LLM sometimes returns `content: null` when making tool calls, not `content: ""`.** Using `(msg.get("content") or "")` instead of `msg.get("content", "")` fixed crashes where the agent would fail on `None` values. This is a subtle but important distinction — the field exists but is null, not missing.
 
 **Fourth, path security matters.** The `safe_path` function prevents directory traversal attacks by rejecting `..` and verifying resolved paths stay within the project root. This is essential when the agent can read arbitrary files. The function also rejects absolute paths to ensure all file access is relative to the project root.
 
@@ -163,6 +182,10 @@ Building this agent taught me several important lessons about working with LLMs 
 **Seventh, the agentic loop needs proper error handling.** Tool calls can fail for many reasons: network errors, file not found, API errors. Each tool returns error messages as strings, which are fed back to the LLM. The LLM can then decide to retry with different parameters or try a different approach. This resilience is crucial for handling real-world failures.
 
 **Eighth, source extraction is important for grading.** The agent extracts source references from the answer using regex patterns, or infers them from the last `read_file` tool call. This allows the autochecker to verify that the agent actually read the relevant files.
+
+**Ninth, API authentication must be handled correctly.** The `query_api` tool automatically includes the `X-API-Key` header with the value from `LMS_API_KEY`. Without this, API calls would return 401 Unauthorized. The authentication is transparent to the LLM — it just calls `query_api` and the tool handles the auth.
+
+**Tenth, understanding the backend code helps with bug diagnosis.** For analytics bugs, knowing that `/completion-rate` has a division operation and `/top-learners` uses `sorted()` helps the agent identify the root cause. The system prompt now explicitly mentions looking for "division operations" and "sorting with None values" when diagnosing analytics bugs.
 
 ## Tool Selection Strategy
 

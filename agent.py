@@ -10,6 +10,9 @@ import re
 import sys
 import urllib.request
 import urllib.error
+import urllib.parse
+import socket
+import ssl
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parent.resolve()
@@ -28,6 +31,11 @@ TOOL SELECTION RULES (follow strictly):
   - Step 1: Use list_files on "wiki" to find relevant files
   - Step 2: Use read_file on the specific wiki file (e.g., "wiki/github.md", "wiki/ssh.md", "wiki/docker.md")
   - Step 3: Find the answer in the file content
+  - Key wiki files:
+    - wiki/github.md - branch protection, GitHub workflows
+    - wiki/ssh.md - SSH connection, keys
+    - wiki/docker.md - Docker commands, cleanup
+    - wiki/git-workflow.md - merge conflicts, Git workflows
 
 **Source code questions** (e.g., "What framework does the backend use?", "Read the source code"):
   - Use read_file on backend files: "backend/app/main.py" for framework, "backend/app/routers/*.py" for routers
@@ -36,7 +44,7 @@ TOOL SELECTION RULES (follow strictly):
   - For docker-compose questions: read_file on "docker-compose.yml"
   - For ETL pipeline: read_file on "backend/app/etl.py"
   - For analytics bugs: read_file on "backend/app/routers/analytics.py"
-  - For "list all routers" questions: 
+  - For "list all routers" questions:
     1. Use list_files on "backend/app/routers"
     2. Read the docstring (first 10 lines) of each .py file to understand its domain
     3. List all routers with their domains in your answer
@@ -55,7 +63,7 @@ TOOL SELECTION RULES (follow strictly):
   - Step 2: Look at the error type (ZeroDivisionError, TypeError, etc.)
   - Step 3: Use read_file on the relevant source file to find the buggy line
   - For analytics bugs: read "backend/app/routers/analytics.py" and look for:
-    - Division operations (risk of ZeroDivisionError)
+    - Division operations (risk of ZeroDivisionError when denominator is 0)
     - Sorting with None values (risk of TypeError)
     - Operations on potentially None values
 
@@ -63,6 +71,7 @@ TOOL SELECTION RULES (follow strictly):
   - Use read_file on multiple relevant files
   - For request journey: read "docker-compose.yml", "Dockerfile", "backend/app/main.py", "caddy/Caddyfile"
   - For ETL idempotency: read "backend/app/etl.py" and look for external_id checks
+  - For error handling comparison: read "backend/app/etl.py" and "backend/app/routers/*.py"
   - Synthesize information from multiple files
 
 IMPORTANT TIPS:
@@ -72,8 +81,10 @@ IMPORTANT TIPS:
 - When asked about branch protection, look in wiki/github.md under "Protect a branch" section
 - When asked about SSH, look in wiki/ssh.md
 - When asked about Docker cleanup, look in wiki/docker.md
-- For framework detection, check imports in backend/app/main.py
+- For framework detection, check imports in backend/app/main.py (look for "from fastapi import")
+- For Dockerfile questions about layers or optimization, read the entire Dockerfile
 - Always read the actual file content - don't guess
+- For bug questions, FIRST query the API to see the error, THEN read the source code
 
 When you have enough information to answer, provide your final answer without calling more tools.
 Include source references when applicable (e.g., "wiki/github.md", "backend/app/main.py").
@@ -183,6 +194,13 @@ def get_config() -> dict:
         "AGENT_API_BASE_URL": os.environ.get("AGENT_API_BASE_URL", docker_env.get("AGENT_API_BASE_URL", "http://localhost:42002")),
     }
     
+    # Debug output
+    print(f"[DEBUG] Config loaded: LLM_API_KEY present: {bool(config['LLM_API_KEY'])}", file=sys.stderr)
+    print(f"[DEBUG] LLM_API_BASE: {config['LLM_API_BASE']}", file=sys.stderr)
+    print(f"[DEBUG] LLM_MODEL: {config['LLM_MODEL']}", file=sys.stderr)
+    print(f"[DEBUG] LMS_API_KEY present: {bool(config['LMS_API_KEY'])}", file=sys.stderr)
+    print(f"[DEBUG] AGENT_API_BASE_URL: {config['AGENT_API_BASE_URL']}", file=sys.stderr)
+    
     return config
 
 
@@ -219,11 +237,13 @@ def tool_read_file(path: str, limit_lines: int = None) -> str:
         if limit_lines:
             # Read only first N lines for large files
             with open(safe, 'r') as f:
-                lines = [next(f) for _ in range(limit_lines)]
+                lines = []
+                for i, line in enumerate(f):
+                    if i >= limit_lines:
+                        break
+                    lines.append(line)
             return ''.join(lines)
         return safe.read_text()
-    except StopIteration:
-        return f"Error: File shorter than requested"
     except ValueError as e:
         return f"Error: {e}"
     except Exception as e:
@@ -260,19 +280,34 @@ def tool_query_api(method: str, path: str, body: str = None) -> str:
     if api_key:
         headers["X-API-Key"] = api_key
 
-    url = f"{base_url.rstrip('/')}{path.lstrip('/')}"
+    # Ensure path starts with /
+    if not path.startswith('/'):
+        path = '/' + path
+    
+    url = f"{base_url.rstrip('/')}{path}"
+    print(f"[DEBUG] API URL: {url}", file=sys.stderr)
 
     try:
         data = None
         if body:
-            try:
-                data = json.loads(body).encode('utf-8')
-            except json.JSONDecodeError:
-                data = body.encode('utf-8') if isinstance(body, str) else body
+            if isinstance(body, str):
+                # Try to parse as JSON first
+                try:
+                    # This validates it's proper JSON
+                    json.loads(body)
+                    data = body.encode('utf-8')
+                except json.JSONDecodeError:
+                    # Not JSON, send as string
+                    data = body.encode('utf-8')
+            else:
+                data = json.dumps(body).encode('utf-8')
 
-        req = urllib.request.Request(url, data=data, headers=headers, method=method)
+        req = urllib.request.Request(url, data=data, headers=headers, method=method.upper())
         
-        with urllib.request.urlopen(req, timeout=5) as response:
+        # Create a context that doesn't verify SSL (for self-signed certs)
+        context = ssl._create_unverified_context()
+        
+        with urllib.request.urlopen(req, context=context, timeout=10) as response:
             response_body = response.read().decode('utf-8')
             return json.dumps({
                 "status_code": response.status,
@@ -280,12 +315,15 @@ def tool_query_api(method: str, path: str, body: str = None) -> str:
             })
             
     except urllib.error.HTTPError as e:
+        error_body = e.read().decode('utf-8') if e.fp else str(e)
         return json.dumps({
             "status_code": e.code,
-            "body": e.read().decode('utf-8') if e.fp else str(e)
+            "body": error_body
         })
     except urllib.error.URLError as e:
-        return json.dumps({"status_code": 0, "body": f"Error: {str(e.reason)}"})
+        return json.dumps({"status_code": 0, "body": f"Connection error: {str(e.reason)}"})
+    except socket.timeout:
+        return json.dumps({"status_code": 0, "body": "Connection timeout"})
     except Exception as e:
         return json.dumps({"status_code": 0, "body": f"Error: {str(e)}"})
 
@@ -310,84 +348,109 @@ def execute_tool(name: str, args: dict) -> str:
 
 
 def call_llm(messages: list, api_key: str, api_base: str, model: str,
-             tools: list = None, timeout: int = 10) -> dict:
+             tools: list = None, timeout: int = 30) -> dict:
     """Call the LLM API using urllib and return the response."""
-    print(f"[DEBUG] Calling LLM with model: {model}", file=sys.stderr)
+    print(f"\n[DEBUG] Calling LLM with model: {model}", file=sys.stderr)
     print(f"[DEBUG] API Base: {api_base}", file=sys.stderr)
-    print(f"[DEBUG] API Key exists: {bool(api_key)}", file=sys.stderr)
     
-    if not api_key:
-        print("[ERROR] LLM_API_KEY is missing", file=sys.stderr)
-        return {"content": "Error: Missing API key", "tool_calls": []}
-        
     if not api_base:
         print("[ERROR] LLM_API_BASE is missing", file=sys.stderr)
         return {"content": "Error: Missing API base URL", "tool_calls": []}
 
-    # Normalize URL
+    # Handle different API base formats
     base = api_base.rstrip('/')
-    if base.endswith('/v1'):
-        base = base[:-3]
-    url = f"{base}/v1/chat/completions"
-    print(f"[DEBUG] Full URL: {url}", file=sys.stderr)
-
+    
+    # For VM API, the endpoint might be different
+    # Try different endpoint patterns
+    urls_to_try = [
+        f"{base}/v1/chat/completions",  # Standard OpenAI format
+        f"{base}/chat/completions",      # Without /v1
+        f"{base}/completions",            # Legacy completions
+    ]
+    
+    # Set up headers - VM API might not need auth
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {api_key}",
     }
+    
+    # Only add auth if key exists and doesn't look like a placeholder
+    if api_key and api_key not in ["not-needed", "EMPTY", ""]:
+        headers["Authorization"] = f"Bearer {api_key}"
 
     payload = {
         "model": model,
         "messages": messages,
         "temperature": 0.7,
-        "max_tokens": 1000,
+        "max_tokens": 2000,
     }
 
     if tools:
         payload["tools"] = tools
+        payload["tool_choice"] = "auto"
         print(f"[DEBUG] Using {len(tools)} tools", file=sys.stderr)
 
-    try:
-        data = json.dumps(payload).encode('utf-8')
-        print(f"[DEBUG] Request payload size: {len(data)} bytes", file=sys.stderr)
-        
-        req = urllib.request.Request(url, data=data, headers=headers, method='POST')
-        
-        with urllib.request.urlopen(req, timeout=5) as response:
-            response_data = json.loads(response.read().decode('utf-8'))
-            
-            choices = response_data.get("choices", [])
-            if not choices:
-                print("[ERROR] No choices in LLM response", file=sys.stderr)
-                print(f"[ERROR] Full response: {response_data}", file=sys.stderr)
-                return {"content": "", "tool_calls": []}
+    data = json.dumps(payload).encode('utf-8')
+    print(f"[DEBUG] Request payload size: {len(data)} bytes", file=sys.stderr)
 
-            message = choices[0].get("message", {})
-            content = message.get("content") or ""
-            tool_calls = message.get("tool_calls", [])
+    # Try each URL pattern
+    last_error = None
+    for url in urls_to_try:
+        try:
+            print(f"[DEBUG] Trying URL: {url}", file=sys.stderr)
             
-            print(f"[DEBUG] Got response with content length: {len(content)}", file=sys.stderr)
-            print(f"[DEBUG] Tool calls: {len(tool_calls)}", file=sys.stderr)
+            req = urllib.request.Request(url, data=data, headers=headers, method='POST')
             
-            return {
-                "content": content,
-                "tool_calls": tool_calls,
-            }
+            # Create context that doesn't verify SSL
+            context = ssl._create_unverified_context()
+            
+            with urllib.request.urlopen(req, context=context, timeout=timeout) as response:
+                response_data = json.loads(response.read().decode('utf-8'))
+                
+                choices = response_data.get("choices", [])
+                if not choices:
+                    print("[ERROR] No choices in LLM response", file=sys.stderr)
+                    continue
 
-    except urllib.error.HTTPError as e:
-        error_body = e.read().decode('utf-8') if e.fp else str(e)
-        print(f"[ERROR] HTTP {e.code} from LLM API", file=sys.stderr)
-        print(f"[ERROR] Response: {error_body[:500]}", file=sys.stderr)
-        return {"content": f"Error: HTTP {e.code}", "tool_calls": []}
-        
-    except urllib.error.URLError as e:
-        print(f"[ERROR] Cannot connect to LLM API: {e.reason}", file=sys.stderr)
-        return {"content": f"Error: Cannot connect - {e.reason}", "tool_calls": []}
-        
-    except Exception as e:
-        print(f"[ERROR] Unexpected error: {type(e).__name__}: {e}", file=sys.stderr)
-        return {"content": f"Error: {type(e).__name__}", "tool_calls": []}
+                message = choices[0].get("message", {})
+                content = message.get("content")
+                if content is None:
+                    content = ""
+                
+                tool_calls = message.get("tool_calls", [])
+                
+                print(f"[DEBUG] Got response with content length: {len(content)}", file=sys.stderr)
+                print(f"[DEBUG] Tool calls: {len(tool_calls)}", file=sys.stderr)
+                
+                return {
+                    "content": content,
+                    "tool_calls": tool_calls,
+                }
 
+        except urllib.error.HTTPError as e:
+            error_body = e.read().decode('utf-8') if e.fp else str(e)
+            print(f"[DEBUG] HTTP {e.code} from {url}: {error_body[:200]}", file=sys.stderr)
+            last_error = f"HTTP {e.code}"
+            continue
+            
+        except urllib.error.URLError as e:
+            print(f"[DEBUG] Cannot connect to {url}: {e.reason}", file=sys.stderr)
+            last_error = f"Connection error: {e.reason}"
+            continue
+            
+        except socket.timeout:
+            print(f"[DEBUG] Timeout connecting to {url}", file=sys.stderr)
+            last_error = "Timeout"
+            continue
+            
+        except Exception as e:
+            print(f"[DEBUG] Unexpected error with {url}: {type(e).__name__}: {e}", file=sys.stderr)
+            last_error = f"{type(e).__name__}"
+            continue
+
+    # If we get here, all endpoints failed
+    error_msg = f"Error: Cannot connect to LLM API - {last_error}"
+    print(f"[ERROR] {error_msg}", file=sys.stderr)
+    return {"content": error_msg, "tool_calls": []}
 
 def run_agentic_loop(question: str, config: dict) -> dict:
     """Run the agentic loop to answer a question."""
@@ -405,30 +468,52 @@ def run_agentic_loop(question: str, config: dict) -> dict:
 
     try:
         for iteration in range(MAX_TOOL_CALLS):
-            print(f"Iteration {iteration + 1}/{MAX_TOOL_CALLS}...", file=sys.stderr)
+            print(f"\n=== Iteration {iteration + 1}/{MAX_TOOL_CALLS} ===", file=sys.stderr)
 
-            response = call_llm(messages, api_key, api_base, model, tools=TOOL_SCHEMAS)
+            response = call_llm(messages, api_key, api_base, model, tools=TOOL_SCHEMAS, timeout=30)
+
+            # Check if we got an error
+            content = response.get("content", "")
+            if content.startswith("Error:"):
+                last_answer = content
+                break
 
             tool_calls = response.get("tool_calls", [])
 
+            if content:
+                print(f"  LLM response: {content[:100]}...", file=sys.stderr)
+
             if tool_calls:
+                print(f"  Tool calls requested: {len(tool_calls)}", file=sys.stderr)
+                
                 for tc in tool_calls:
                     try:
-                        func = tc.get("function", {})
-                        if not func:
+                        # Handle different tool call formats
+                        if isinstance(tc, dict):
+                            if "function" in tc:
+                                func = tc["function"]
+                            elif "name" in tc and "arguments" in tc:
+                                func = {"name": tc["name"], "arguments": tc["arguments"]}
+                            else:
+                                func = tc
+                        else:
                             func = {}
+                        
                         name = func.get("name", "unknown")
                         args_str = func.get("arguments", "{}")
 
                         try:
-                            args = json.loads(args_str) if isinstance(args_str, str) else args_str
+                            if isinstance(args_str, str):
+                                args = json.loads(args_str)
+                            else:
+                                args = args_str
                         except (json.JSONDecodeError, TypeError):
                             args = {}
 
                         if not isinstance(args, dict):
                             args = {}
 
-                        print(f"  Calling tool: {name}({args})", file=sys.stderr)
+                        print(f"  -> Calling tool: {name}({json.dumps(args)[:100]})", file=sys.stderr)
                         result = execute_tool(name, args)
 
                         tool_calls_log.append({
@@ -437,21 +522,23 @@ def run_agentic_loop(question: str, config: dict) -> dict:
                             "result": result,
                         })
 
-                        tool_call_id = tc.get("id", "")
-                        if not tool_call_id:
-                            tool_call_id = f"call_{len(tool_calls_log)}"
+                        # Get tool call ID
+                        tool_call_id = tc.get("id", f"call_{len(tool_calls_log)}")
 
                         messages.append({
                             "role": "tool",
                             "tool_call_id": tool_call_id,
                             "content": result,
                         })
+                        
+                        print(f"  <- Tool result: {result[:100]}...", file=sys.stderr)
+                        
                     except Exception as e:
                         print(f"  Error processing tool call: {e}", file=sys.stderr)
                         continue
             else:
-                last_answer = response.get("content") or ""
-                print(f"Final answer received", file=sys.stderr)
+                last_answer = content
+                print(f"  Final answer received", file=sys.stderr)
                 break
         else:
             print("Max tool calls reached, using last available answer", file=sys.stderr)
@@ -465,12 +552,19 @@ def run_agentic_loop(question: str, config: dict) -> dict:
     # Extract source from answer or from tool calls
     source = ""
     try:
-        if last_answer:
+        if last_answer and not last_answer.startswith("Error:"):
+            # Look for wiki or file paths in the answer
             match = re.search(r'(wiki/[\w-]+\.md(?:#[\w-]+)?)', last_answer)
             if match:
                 source = match.group(1)
+            
+            if not source:
+                match = re.search(r'(backend/app/[\w/]+\.py)', last_answer)
+                if match:
+                    source = match.group(1)
 
         if not source and tool_calls_log:
+            # Look at the last read_file call
             for tc in reversed(tool_calls_log):
                 if tc.get("tool") == "read_file":
                     path = tc.get("args", {}).get("path", "")
@@ -494,6 +588,7 @@ def main() -> None:
         sys.exit(1)
 
     question = sys.argv[1]
+    print(f"[DEBUG] Question: {question}", file=sys.stderr)
 
     # Get configuration (from env vars or files)
     config = get_config()
@@ -504,6 +599,7 @@ def main() -> None:
         print(json.dumps(response))
     except Exception as e:
         # Catch any unexpected errors and return valid JSON
+        print(f"[ERROR] Unhandled exception: {e}", file=sys.stderr)
         result = {
             "answer": f"Error: {e}",
             "source": "",
