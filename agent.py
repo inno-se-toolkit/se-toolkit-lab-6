@@ -640,7 +640,7 @@ def agent_loop(question):
 
                 if has_query_api and has_read_file:
                     # Both done - force final answer (only once)
-                    if not any(tc.get("forced_final_answer") for tc in all_tool_calls):
+                    if not any(tc.get("tool") == "forced_final_answer" for tc in all_tool_calls):
                         debug_log("Bug question: API queried and source read. Forcing final answer.")
                         messages.append({"role": "assistant", "content": content})
                         nudge = (
@@ -653,6 +653,19 @@ def agent_loop(question):
                         all_tool_calls.append({"tool": "forced_final_answer", "args": {}, "result": "forced"})
                         reprompt_count += 1
                         continue  # loop again to get final answer
+                    else:
+                        # Already forced once - just return the answer
+                        debug_log("Bug question: Already forced final answer. Returning current content.")
+                        source = ""
+                        for tc in reversed(all_tool_calls):
+                            if tc["tool"] == "read_file":
+                                source = tc["args"].get("path", "")
+                                break
+                        return {
+                            "answer": content,
+                            "source": source,
+                            "tool_calls": [tc for tc in all_tool_calls if tc.get("tool") != "forced_final_answer"]
+                        }
 
             # Check for comparison questions - ensure BOTH files are read
             if is_comparison_q or is_error_handling_q:
