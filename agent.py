@@ -660,6 +660,9 @@ def agent_loop(question):
             if is_bug_q:
                 has_query_api = any(tc["tool"] == "query_api" for tc in all_tool_calls)
                 has_read_file = any(tc["tool"] == "read_file" for tc in all_tool_calls)
+                
+                # Count how many times we've tried different labs
+                query_api_count = len([tc for tc in all_tool_calls if tc["tool"] == "query_api"])
 
                 if has_query_api and has_read_file:
                     # Both done - force final answer (only once)
@@ -669,13 +672,27 @@ def agent_loop(question):
                         nudge = (
                             "You have queried the API and read the source code. "
                             "Now provide your final answer explaining the error and the bug in the source code. "
-                            "Look for division by zero and None-unsafe sorted() calls."
+                            "Look for division by zero and None-unsafe sorted() calls. "
+                            "DO NOT make more API calls - you have enough information."
                         )
                         messages.append({"role": "user", "content": nudge})
                         # Mark that we forced final answer
                         all_tool_calls.append({"tool": "forced_final_answer", "args": {}, "result": "forced"})
                         reprompt_count += 1
                         continue  # loop again to get final answer
+                    elif query_api_count >= 2:
+                        # Already made multiple queries - just return the answer
+                        debug_log(f"Bug question: Already made {query_api_count} API calls. Returning current content.")
+                        source = ""
+                        for tc in reversed(all_tool_calls):
+                            if tc["tool"] == "read_file":
+                                source = tc["args"].get("path", "")
+                                break
+                        return {
+                            "answer": content,
+                            "source": source,
+                            "tool_calls": [tc for tc in all_tool_calls if tc.get("tool") != "forced_final_answer"]
+                        }
                     else:
                         # Already forced once - just return the answer
                         debug_log("Bug question: Already forced final answer. Returning current content.")
