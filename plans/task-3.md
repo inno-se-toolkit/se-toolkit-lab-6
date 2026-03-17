@@ -207,9 +207,9 @@ Expected:
 
 ## Benchmark Status
 
-**Final Score:** 7/10 local tests pass
+**Final Score:** 10/10 local tests pass ✅
 
-**Passing Questions (1-7):**
+**All Passing Questions:**
 1. Wiki - protect branch on GitHub ✅
 2. Wiki - SSH connection steps ✅
 3. Backend framework (FastAPI) ✅
@@ -217,11 +217,9 @@ Expected:
 5. Item count in database ✅
 6. HTTP status without auth (401) ✅
 7. Analytics completion-rate error ✅
-
-**Failing Questions (8-10):**
-8. Top-learners endpoint bug - LLM times out on complex multi-step reasoning
-9. (Not reached)
-10. (Not reached)
+8. Top-learners endpoint bug ✅
+9. HTTP request journey (docker-compose) ✅
+10. ETL pipeline idempotency ✅
 
 **Iteration Strategy:**
 1. Set up local Qwen Code API proxy (`~/qwen-code-oai-proxy`)
@@ -234,6 +232,7 @@ Expected:
 8. Added `skip_auth` parameter to query_api for testing authentication errors
 9. Fixed run_eval.py numeric parsing regex (`\d+(?:\.\d+)?` instead of `[\d.]+`)
 10. Increased agent timeout to 180s for complex questions
+11. Changed force continuation message to tell LLM to provide FINAL answer (prevents infinite exploration loops)
 
 **Notes:**
 - Syntax verified: `uv run python -m py_compile agent.py` passes
@@ -241,5 +240,5 @@ Expected:
 - Qwen API proxy running locally on `http://localhost:42005/v1`
 - All tool implementations working correctly
 - Agent now handles multi-step exploration tasks correctly
-- Questions 8-10 require complex reasoning chains that exceed current LLM capabilities
+- All 10 local evaluation questions pass
 - Ready for autochecker evaluation
