@@ -1,17 +1,30 @@
-# Agent (Task 1)
+# AGENT.md
 
-Run:
-uv run agent.py "your question"
+## Overview
+This agent is a simple CLI program for Task 1 of Lab 6.
 
-The agent reads LLM config from `.env.agent.secret`:
-- LLM_API_KEY
-- LLM_API_BASE
-- LLM_MODEL
+It:
+1. Accepts a question from the command line.
+2. Sends the question to an OpenAI-compatible LLM API.
+3. Prints a structured JSON response to stdout.
 
-It calls the OpenAI-compatible endpoint:
-POST {LLM_API_BASE}/chat/completions
+## LLM provider
+Qwen Code API
 
-Output: a single JSON line to stdout:
-{"answer": "...", "tool_calls": []}
+## Model
+`qwen3-coder-plus`
 
-Debug logs go to stderr.
+## Files
+- `agent.py` — main CLI agent
+- `.env.agent.secret` — secret LLM configuration
+- `plans/task-1.md` — implementation plan
+
+## Environment variables
+The agent reads these values from `.env.agent.secret`:
+- `LLM_API_KEY`
+- `LLM_API_BASE`
+- `LLM_MODEL`
+
+## Run
+```bash
+uv run agent.py "What does REST stand for?"

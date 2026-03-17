@@ -43,8 +43,7 @@ def main() -> None:
         "temperature": 0.2,
     }
 
-    # debug -> stderr
-    eprint(f"Calling LLM: {url} model={model}")
+   
 
     with httpx.Client(timeout=55.0) as client:
         r = client.post(
