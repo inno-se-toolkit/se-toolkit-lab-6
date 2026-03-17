@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 
 
 # Maximum number of tool calls per question
-MAX_TOOL_CALLS = 10
+MAX_TOOL_CALLS = 20
 
 
 def load_env():
@@ -308,7 +308,7 @@ def get_system_prompt():
 
 Available tools:
 1. list_files - Discover what files exist in a directory
-2. read_file - Read documentation or source code files
+2. read_file - Read documentation or source code files  
 3. query_api - Query the live backend API for current data
 
 When to use each tool:
@@ -325,6 +325,13 @@ When to use each tool:
 - Analytics and statistics
 - Any question asking "how many", "what is the count", "show me data"
 
+Critical rules:
+- NEVER output partial thoughts like "Let me check..." - either use a tool OR give a complete answer
+- When asked to "list all X" or describe multiple things, you MUST read ALL relevant files before answering
+- For router/file exploration: list the directory, then read EVERY file in that directory in subsequent tool calls
+- Only return a final text answer when you have gathered ALL information and can provide a COMPLETE answer
+- Your final answer should include all items/files requested, not partial lists
+
 For source references:
 - For wiki files: use format wiki/filename.md#section-anchor
 - Section anchors are heading text in lowercase with hyphens instead of spaces
@@ -337,7 +344,7 @@ Always include the source reference at the end of your answer:
 - For API: "Source: API endpoint GET /items/"
 - For source code: "Source: backend/app/main.py"
 
-If you cannot find the answer, say so honestly and explain what you tried."""
+If you cannot find the answer after thorough exploration, say so honestly and explain what you tried."""
 
 
 def call_llm(messages: list, api_key: str, api_base: str, model: str, tools: list = None, timeout: int = 120) -> dict:
@@ -546,9 +553,45 @@ def run_agentic_loop(question: str, api_key: str, api_base: str, model: str) -> 
                 tool_call_count += 1
                 print(f"Tool result (truncated): {result[:200]}...", file=sys.stderr)
         else:
-            # No tool calls - this is the final answer
-            print(f"Final answer received", file=sys.stderr)
+            # No tool calls - check if this is a complete answer
             answer = response.get("content") or ""
+            
+            # Detect incomplete answers that indicate more work is needed
+            incomplete_indicators = [
+                "let me check",
+                "let me see",
+                "let me continue",
+                "let me examine",
+                "i'll check",
+                "i need to check",
+                "i should check",
+                "now let me",
+                "next i'll",
+                "continue checking",
+            ]
+            
+            answer_lower = answer.lower()
+            is_incomplete = any(indicator in answer_lower for indicator in incomplete_indicators)
+            
+            # Also check if answer ends with colon (indicating more to come)
+            ends_with_colon = answer.strip().endswith(":")
+            
+            if is_incomplete or ends_with_colon:
+                # Force more tool calls by adding a prompt to continue
+                print(f"Incomplete answer detected, forcing more exploration...", file=sys.stderr)
+                messages.append({
+                    "role": "assistant",
+                    "content": answer,
+                })
+                messages.append({
+                    "role": "user",
+                    "content": "Please continue using tools to gather more information. Only provide a final answer when you have completed the task.",
+                })
+                tool_call_count += 1  # Count this as an iteration
+                continue
+            
+            # This is a complete final answer
+            print(f"Final answer received", file=sys.stderr)
             source = extract_source_from_response(answer, all_tool_calls)
 
             return {
