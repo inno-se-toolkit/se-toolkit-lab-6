@@ -33,9 +33,6 @@
 
 ## About the VM access
 
-<!-- TODO first explicitly log in as root -->
-<!-- TODO add LOCAL, REMOTE labels -->
-
 > [!NOTE]
 > Replace [`<user>`](./operating-system.md#user-placeholder) with the actual [username](./operating-system.md#username).
 
