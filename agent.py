@@ -41,6 +41,11 @@ Tool selection guide:
 - For wiki/documentation questions, use list_files and read_file on wiki/
 - To test unauthenticated access (e.g., "what status code without auth?"), use query_api with auth=false
 
+DEBUGGING TIP: When an API endpoint returns an error:
+- If you get 422 (missing parameter), try again with the required parameter (e.g., ?lab=lab-01)
+- If you get 500 (server error), read the error message and traceback, then read the source code to find the bug
+- For analytics endpoints, always try with a lab parameter like ?lab=lab-01 or ?lab=lab-99
+
 IMPORTANT: All paths must be relative to the project root. For example:
 - To list backend app files: use list_files("backend/app")
 - To read a router: use read_file("backend/app/routers/items.py")
@@ -56,6 +61,8 @@ SOURCE REFERENCE: At the end of your answer, always include a "Source:" line wit
 This is REQUIRED - always include at least one source reference.
 
 RESPONSE FORMAT: Your final answer must be complete and self-contained. When asked to list multiple items (like router modules), read all relevant files and provide a comprehensive summary. Never say "let me check" or "I'll continue" - gather all information first, then provide the complete answer.
+
+For bug diagnosis questions: Always identify the specific error type (e.g., TypeError, ZeroDivisionError), the line or operation causing it, and explain why it happens in the code.
 """
 
 
