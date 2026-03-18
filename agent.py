@@ -23,7 +23,11 @@ from dotenv import load_dotenv
 
 def load_llm_config() -> dict:
     """
-    Load LLM configuration from .env.agent.secret file.
+    Load LLM configuration from environment variables.
+
+    Reads from:
+    1. Direct environment variables (highest priority)
+    2. .env.agent.secret file (for local development)
 
     Returns:
         dict with keys: LLM_API_KEY, LLM_API_BASE, LLM_MODEL
@@ -31,24 +35,26 @@ def load_llm_config() -> dict:
     Raises:
         SystemExit: If required configuration is missing
     """
-    # Load from .env.agent.secret in the project root
+    # First, try to load from .env.agent.secret file (local development)
     env_file = Path(__file__).parent / ".env.agent.secret"
-    load_dotenv(env_file)
+    if env_file.exists():
+        load_dotenv(env_file)
 
+    # Read from environment variables (works for both local and autochecker)
     api_key = os.getenv("LLM_API_KEY")
     api_base = os.getenv("LLM_API_BASE")
     model = os.getenv("LLM_MODEL")
 
     if not api_key:
-        print("Error: LLM_API_KEY not found in .env.agent.secret", file=sys.stderr)
+        print("Error: LLM_API_KEY not found in environment variables", file=sys.stderr)
         sys.exit(1)
 
     if not api_base:
-        print("Error: LLM_API_BASE not found in .env.agent.secret", file=sys.stderr)
+        print("Error: LLM_API_BASE not found in environment variables", file=sys.stderr)
         sys.exit(1)
 
     if not model:
-        print("Error: LLM_MODEL not found in .env.agent.secret", file=sys.stderr)
+        print("Error: LLM_MODEL not found in environment variables", file=sys.stderr)
         sys.exit(1)
 
     return {
