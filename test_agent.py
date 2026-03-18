@@ -35,6 +35,7 @@ def test_read_file_tool():
 
     assert "answer" in data, "Missing 'answer' field"
     assert "tool_calls" in data, "Missing 'tool_calls' field"
+    assert "source" in data, "Missing 'source' field"
     assert isinstance(data["tool_calls"], list), "'tool_calls' must be a list"
     assert len(data["tool_calls"]) > 0, "Expected at least one tool call"
 
@@ -45,6 +46,9 @@ def test_read_file_tool():
     # Check that git-workflow.md was accessed
     file_paths = [call["args"].get("file_path", "") for call in data["tool_calls"] if call["tool"] == "read_file_content"]
     assert any("git-workflow.md" in path for path in file_paths), "Expected git-workflow.md to be read"
+
+    # Check source field contains git-workflow.md
+    assert "git-workflow.md" in data["source"], "Expected source to reference git-workflow.md"
 
 def test_list_files_tool():
     """Test that the agent uses list_files tool to discover wiki files."""

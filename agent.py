@@ -15,7 +15,16 @@ global LLM_TEMPERATURE
 global LLM_TOOLS
 
 chat_history = []
-tool_calls_log = [] 
+tool_calls_log = []
+system_prompt = """You are a helpful documentation assistant. You have access to tools to read files and list directories in the project wiki.
+
+When answering questions:
+1. Use list_files to discover what files exist in the wiki directory
+2. Use read_file_content to read relevant files and find the answer
+3. Include the source reference in your answer (format: wiki/filename.md#section-anchor)
+4. Be concise and accurate
+
+Always use tools to find answers - do not rely on your pre-trained knowledge.""" 
 
 # get prompt from command line
 def get_user_input():
@@ -62,6 +71,10 @@ def send_request():
     global LLM_TEMPERATURE
     global LLM_TOOLS
     global chat_history
+    global system_prompt
+
+    # Prepend system prompt as first user message
+    messages = [{"role": "user", "content": system_prompt}] + chat_history
 
     response = requests.post(
         f"{LLM_API_BASE}/messages",
@@ -71,9 +84,9 @@ def send_request():
         },
         json={
             "model": LLM_MODEL,
-            "messages": chat_history,
+            "messages": messages,
             "tools": LLM_TOOLS,
-            "max_tokens": 128,
+            "max_tokens": 512,
             "temperature": float(LLM_TEMPERATURE),
         },
     )
@@ -150,13 +163,23 @@ if __name__ == "__main__":
         parse_tools()
         prompt = get_user_input()
         final_answer = agentic_loop(prompt)
-        
+
+        # Extract source from the last read_file_content call
+        source = ""
+        for call in reversed(tool_calls_log):
+            if call["tool"] == "read_file_content":
+                file_path = call["args"].get("file_path", "")
+                if file_path:
+                    source = file_path
+                    break
+
         output = {
             "answer": final_answer,
+            "source": source,
             "tool_calls": tool_calls_log
         }
         print(json.dumps(output))
-        
+
         exit(0)
 
     except requests.exceptions.ConnectionError as e:
