@@ -27,13 +27,7 @@ services:
         condition: service_healthy
 
   postgres:
-    # A portable solution: download image from Docker Hub.
-    # image: postgres:18.3-alpine
-
-    # A less portable solution: download image through a cache proxy provided by the University.
-    # This solution is necessary to avoid "Too many requests" errors.
-    # This solution may not work outside of the University network.
-    image: harbor.pg.innopolis.university/docker-hub-cache/postgres:18.3-alpine
+    image: postgres:18.3-alpine
     restart: unless-stopped
     environment:
       - POSTGRES_DB=${POSTGRES_DB:?'POSTGRES_DB is required'}
@@ -55,13 +49,7 @@ services:
       retries: 5
 
   pgadmin:
-    # A portable solution: download image from Docker Hub.
-    # image: dpage/pgadmin4:latest
-
-    # A less portable solution: download image through a cache proxy provided by the University.
-    # This solution is necessary to avoid "Too many requests" errors.
-    # This solution may not work outside of the University network.
-    image: harbor.pg.innopolis.university/docker-hub-cache/dpage/pgadmin4:latest
+    image: dpage/pgadmin4:latest
     restart: unless-stopped
     environment:
       - PGADMIN_DEFAULT_EMAIL=${PGADMIN_EMAIL:?'PGADMIN_EMAIL is required'}
