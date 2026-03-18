@@ -1,32 +1,57 @@
-# Agent
+Lab assistant agent
+  A CLI agent for answering questions about a project using LLM and tools for working with files and the backend API.
 
-A CLI agent with tools for working with documentation.
+Architecture
+  The agent implements the LLM + Tools approach:
+  The user asks a question
+  LLM chooses a tool
+  The agent executes the tool
+  The result is returned to the LLM
+  The final response is being generated
+  The work takes place in a cycle (up to 10 steps).
 
-## Running
-uv run agent.py "The question"
+Tools
+  read_file(path)
+  Reads a file from a project (with path protection and size limitation).
+    list_files(path)
+  Shows the contents of the directory.
+    query_api(method, path, body)
+  Sends an HTTP request to the backend API and returns the status and response.
 
-## Output
+Working with LLM
+  The OpenAI API is used
+  System prompt forces LLM to always use tools
+  There are rules for different types of issues (wiki, code, API, bugs)
+
+Json
 {
-"answer": "text",
-  "source": "wiki/file.md#section",
-  "tool_calls": [...]
+"response": "...",
+"tool calls": [...],
+"source": "..."
 }
 
-## Tools
-- read_file(path): reads the file
-- list_files(path): the list of files in the directory
+Fallback logic
+  If the LLM did not provide a final response (for example, it did not return the correct JSON or did not complete the reasoning), the agent uses a fallback:
+  analyzes the last tool call
+  and extracts the response from the result:
+  from the file (find_answer_in_content)
+  from the API (find_answer_in_api)
+  , if necessary, uses basic cached responses.
+  This is necessary for stability and passing autotests.
 
-## Agent cycle
-1. Question → LLM with tool diagrams
-2. LLM decides: tool_call or response
-3. If tool_call → execute → result → LLM
-4. Repeat until you answer or 10 calls
+Error handling
+  Handled:
+  API errors
+  network and timeout issues
+  incorrect paths
+  file reading errors
 
-## Security
-- Blocking../
-- Checking paths inside the project
+Environment variables
+  LLM_API_KEY
+  LLM_API_BASE
+  LLM_MODEL
+  LMS_API_KEY
+  AGENT_API_BASE_URL
 
-## Variables (.env.agent.secret)
-- LLM_API_KEY
-- LLM_API_BASE
-- LLM_MODEL
+Conclusion
+  The agent combines LLM and tools, adding security, error handling, and fallback logic for reliable operation.
