@@ -96,3 +96,36 @@ def test_agent_list_files_tool():
     assert "list_files" in tool_names, "Expected list_files to be called"
 
     print(f"✓ Test passed. Found {len(data['tool_calls'])} tool call(s)")
+
+
+def test_agent_query_api_for_data_question():
+    """Test that agent uses query_api for data-dependent questions."""
+    # Run agent with a question that should trigger query_api
+    data = run_agent("How many items are in the database?")
+
+    # Verify required fields
+    assert "answer" in data, "Missing 'answer' field"
+    assert "tool_calls" in data, "Missing 'tool_calls' field"
+
+    # Verify query_api was called
+    tool_names = [call.get("tool") for call in data["tool_calls"]]
+    assert "query_api" in tool_names, "Expected query_api to be called for data question"
+
+    print(f"✓ Test passed. Agent used query_api for data question")
+
+
+def test_agent_read_file_for_framework_question():
+    """Test that agent uses read_file for system framework questions."""
+    # Run agent with a question about the backend framework
+    data = run_agent("What Python web framework does this project use?")
+
+    # Verify required fields
+    assert "answer" in data, "Missing 'answer' field"
+    assert "source" in data, "Missing 'source' field"
+    assert "tool_calls" in data, "Missing 'tool_calls' field"
+
+    # Verify read_file was called (framework info should be in documentation)
+    tool_names = [call.get("tool") for call in data["tool_calls"]]
+    assert "read_file" in tool_names, "Expected read_file to be called for framework question"
+
+    print(f"✓ Test passed. Agent used read_file for framework question")
