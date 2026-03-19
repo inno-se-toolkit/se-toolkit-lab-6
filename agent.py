@@ -145,23 +145,114 @@ def _tool_list_files(path: str) -> str:
         return f"Error listing {path}: {e}"
 
 
+def _tool_query_api(method: str, path: str, body: str | None = None) -> str:
+    """
+    Query the deployed backend API.
+    
+    Parameters:
+      method (string): HTTP method (GET, POST, PUT, DELETE, etc.)
+      path (string): API endpoint path (e.g., /items/, /analytics/completion-rate?lab=lab-01)
+      body (string, optional): JSON request body for POST/PUT requests
+    
+    Returns:
+      JSON string with status_code and body fields
+    """
+    try:
+        # Get API configuration from environment
+        base_url = os.environ.get("AGENT_API_BASE_URL", "http://localhost:42002").rstrip("/")
+        api_key = _require_env("LMS_API_KEY")
+        
+        # Build full URL
+        url = f"{base_url}{path}"
+        
+        # Prepare headers with Bearer token authentication
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+        
+        # Prepare request body
+        request_kwargs: dict[str, Any] = {
+            "headers": headers,
+        }
+        
+        if method.upper() in ("POST", "PUT", "PATCH"):
+            if body:
+                try:
+                    json.loads(body)  # Validate it's valid JSON
+                    request_kwargs["content"] = body
+                except json.JSONDecodeError:
+                    return json.dumps({
+                        "status_code": 400,
+                        "body": "Invalid JSON in request body",
+                    })
+            else:
+                request_kwargs["content"] = ""
+        
+        # Make the request
+        timeout = httpx.Timeout(timeout=30.0, connect=10.0)
+        with httpx.Client(timeout=timeout, trust_env=False) as client:
+            if method.upper() == "GET":
+                resp = client.get(url, headers=headers)
+            elif method.upper() == "POST":
+                resp = client.post(url, **request_kwargs)
+            elif method.upper() == "PUT":
+                resp = client.put(url, **request_kwargs)
+            elif method.upper() == "DELETE":
+                resp = client.delete(url, headers=headers)
+            elif method.upper() == "PATCH":
+                resp = client.patch(url, **request_kwargs)
+            else:
+                return json.dumps({
+                    "status_code": 400,
+                    "body": f"Unsupported HTTP method: {method}",
+                })
+        
+        # Return response with status code and body
+        try:
+            body_data = resp.json()
+        except Exception:
+            body_data = resp.text
+        
+        return json.dumps({
+            "status_code": resp.status_code,
+            "body": body_data,
+        })
+    
+    except RuntimeError as e:
+        return json.dumps({
+            "status_code": 500,
+            "body": str(e),
+        })
+    except Exception as e:
+        return json.dumps({
+            "status_code": 500,
+            "body": f"API request failed: {e}",
+        })
+
+
 def _call_tool(tool_name: str, args: dict[str, Any]) -> str:
     """
     Execute a tool and return the result.
     
     Parameters:
-      tool_name: "read_file" or "list_files"
-      args: Tool arguments dict with "path" key
+      tool_name: "read_file", "list_files", or "query_api"
+      args: Tool arguments dict
     
     Returns:
       Tool result as string
     """
-    path = args.get("path", "")
-    
     if tool_name == "read_file":
+        path = args.get("path", "")
         return _tool_read_file(path)
     elif tool_name == "list_files":
+        path = args.get("path", "")
         return _tool_list_files(path)
+    elif tool_name == "query_api":
+        method = args.get("method", "GET")
+        path = args.get("path", "")
+        body = args.get("body")
+        return _tool_query_api(method, path, body)
     else:
         return f"Unknown tool: {tool_name}"
 
@@ -202,6 +293,31 @@ def _get_tool_schemas() -> list[dict[str, Any]]:
                         }
                     },
                     "required": ["path"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "query_api",
+                "description": "Query the deployed backend API for live system data (items count, analytics, status codes). Use for framework/tech stack questions and data-dependent queries. Do NOT use for documentation lookups.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "method": {
+                            "type": "string",
+                            "description": "HTTP method: GET, POST, PUT, DELETE, PATCH",
+                        },
+                        "path": {
+                            "type": "string",
+                            "description": "API endpoint path, e.g. '/items/' or '/analytics/completion-rate?lab=lab-01'. Must include query string if needed.",
+                        },
+                        "body": {
+                            "type": "string",
+                            "description": "Optional JSON request body for POST/PUT/PATCH requests",
+                        },
+                    },
+                    "required": ["method", "path"],
                 },
             },
         },
@@ -305,14 +421,33 @@ def _run_agentic_loop(question: str) -> dict[str, Any]:
       - source: wiki reference
       - tool_calls: list of all tool calls made
     """
-    system_prompt = """You are a helpful documentation assistant. Your role is to answer questions about the project by using available tools.
+    system_prompt = """You are a helpful system agent. Your role is to answer questions about the project by using available tools.
 
-Rules:
-1. Use list_files to explore the wiki directory structure
-2. Use read_file to read documentation files
-3. Focus on the wiki/ directory for answers
-4. In your final answer, include a reference to the source file with a section anchor (e.g., wiki/git.md#resolving-merge-conflicts)
-5. Be concise and cite your sources"""
+TOOL SELECTION RULES:
+
+1. **read_file / list_files** — Use for DOCUMENTATION and SOURCE CODE lookups:
+   - Questions about how to do something ("How do you resolve a merge conflict?")
+   - Process documentation ("What are the steps to protect a branch?")
+   - Code examples or implementation details (read source code)
+   - Always look in wiki/ directory first for process docs
+
+2. **query_api** — Use for LIVE SYSTEM DATA and FRAMEWORK/TECH FACTS:
+   - "How many items are in the database?" → GET /items/
+   - "What framework does this project use?" → Check framework from API or docs
+   - "What are the status codes?" → Check API documentation or responses
+   - "What's the completion rate for lab-99?" → GET /analytics/completion-rate?lab=lab-99
+   - Any analytics/metrics queries → GET /analytics/*
+
+3. **Never hardcode answers** — Always query the API for data-dependent questions.
+
+WORKFLOW:
+- Start by listing wiki/ files to understand available documentation
+- For data questions, immediately call query_api with the right endpoint
+- Combine tools as needed (e.g., read docs to understand framework, then query API)
+
+FINAL ANSWER:
+- Include a source reference when possible (e.g., "wiki/git.md#section" or "API: /items/")
+- Be concise and cite your tools/sources"""
 
     messages: list[dict[str, Any]] = [
         {"role": "system", "content": system_prompt},
@@ -433,6 +568,7 @@ def main() -> None:
 
     # Local convenience for development; autochecker injects env vars.
     _load_env_file(".env.agent.secret")
+    _load_env_file(".env.docker.secret")
 
     try:
         result = _run_agentic_loop(question)
