@@ -7,6 +7,7 @@ The autochecker dashboard API provides two endpoints:
 Both require HTTP Basic Auth (email + password from settings).
 """
 
+import logging
 from datetime import datetime
 
 import httpx
@@ -18,6 +19,8 @@ from app.models.item import ItemRecord
 from app.models.learner import Learner
 from app.settings import settings
 
+logger = logging.getLogger(__name__)
+
 
 # ---------------------------------------------------------------------------
 # Extract — fetch data from the autochecker API
@@ -26,7 +29,7 @@ from app.settings import settings
 
 async def fetch_items() -> list[dict]:
     """Fetch the lab/task catalog from the autochecker API."""
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=60.0) as client:
         resp = await client.get(
             f"{settings.autochecker_api_url}/api/items",
             auth=(settings.autochecker_email, settings.autochecker_password),
@@ -37,30 +40,62 @@ async def fetch_items() -> list[dict]:
 
 async def fetch_logs(since: datetime | None = None) -> list[dict]:
     """Fetch check results from the autochecker API with pagination."""
-    all_logs: list[dict] = []
+    import asyncio
 
-    async with httpx.AsyncClient() as client:
+    all_logs: list[dict] = []
+    max_retries = 3
+    base_delay = 2.0  # seconds between requests
+
+    async with httpx.AsyncClient(
+        timeout=120.0,
+        headers={
+            "Accept": "application/json",
+            "Connection": "keep-alive",
+        },
+    ) as client:
         cursor = since
+        iteration = 0
         while True:
-            params: dict[str, str | int] = {"limit": 500}
+            iteration += 1
+            params: dict[str, str | int] = {"limit": 100}
             if cursor is not None:
                 params["since"] = cursor.isoformat()
 
-            resp = await client.get(
-                f"{settings.autochecker_api_url}/api/logs",
-                params=params,
-                auth=(settings.autochecker_email, settings.autochecker_password),
-            )
-            resp.raise_for_status()
+            logger.info(f"Fetching logs iteration {iteration}, since={cursor}")
+            
+            # Retry logic with exponential backoff
+            for attempt in range(max_retries):
+                try:
+                    resp = await client.get(
+                        f"{settings.autochecker_api_url}/api/logs",
+                        params=params,
+                        auth=(settings.autochecker_email, settings.autochecker_password),
+                    )
+                    resp.raise_for_status()
+                    break  # Success, exit retry loop
+                except httpx.RemoteProtocolError as e:
+                    logger.warning(f"Request failed (attempt {attempt + 1}/{max_retries}): {e}")
+                    if attempt < max_retries - 1:
+                        retry_delay = base_delay * (2 ** attempt)  # Exponential backoff
+                        logger.info(f"Retrying in {retry_delay}s...")
+                        await asyncio.sleep(retry_delay)
+                    else:
+                        raise  # All retries exhausted
+            
             data = resp.json()
 
             logs = data["logs"]
             all_logs.extend(logs)
+            
+            logger.info(f"Got {len(logs)} logs, total={len(all_logs)}, has_more={data.get('has_more')}")
 
             if not data.get("has_more") or not logs:
                 break
 
             cursor = datetime.fromisoformat(logs[-1]["submitted_at"])
+            
+            # Add delay between requests to avoid rate limiting
+            await asyncio.sleep(base_delay)
 
     return all_logs
 
